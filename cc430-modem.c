@@ -80,21 +80,24 @@ int main(void)
 #endif
   __no_operation();                         // For debugger
 
-  RfReceiveOn();                            // Start listening
-  rf_receiving = 1;
-
   while (1) {
     led_toggle(1);
+
+    if(!rf_transmitting && !rf_receiving) { // If not sending nor listening, start listening
+      RfReceiveOff();
+      /*
+      sleep_ms(1);
+      InitRadio();
+      */
+      rf_receiving = 1;
+      RfReceiveOn();
+    }
+
 #if SC_USE_SLEEP == 1
     __bis_SR_register(LPM0_bits + GIE);     // Sleep while waiting for interrupt
     __no_operation();
 #else
-    {
-      int a;
-      for (a = 0; a < 0; a++) {
-        __delay_cycles(1000);
-      }
-    }
+    sleep_ms(1);
 #endif
 
     if (!rf_transmitting && data_to_send) { // We have data to send over RF
@@ -102,12 +105,6 @@ int main(void)
         continue;
       }
     }
-
-    if(!rf_transmitting && !rf_receiving) { // If not sending nor listening, start listening
-      RfReceiveOn();
-      rf_receiving = 1;
-    }
-
   }
 
   return 0;
@@ -158,13 +155,16 @@ int send_next_msg(void)
 
   // FIXME: enable interrupts?
 
-  // Stop possible receive mode
-  RfReceiveOff();
-  rf_receiving = 0;
+  // Stop receive mode
+  if (rf_receiving) {
+    RfReceiveOff();
+    rf_receiving = 0;
+    sleep_ms(1);
+  }
 
   // Send buffer over RF (len +1 for length byte)
-  RfTransmit((unsigned char*)RfTxBuffer, RfTxBuffer[0] + 1);
   rf_transmitting = 1;
+  RfTransmit((unsigned char*)RfTxBuffer, RfTxBuffer[0] + 1);
   led_on(2);
 
   return 0;
@@ -443,6 +443,14 @@ void USCI_A0_ISR(void)
 __attribute__((interrupt(CC1101_VECTOR)))
 void CC1101_ISR(void)
 {
+#define CC430_STATE_TX                   (0x20)
+#define CC430_STATE_IDLE                 (0x00)
+#define CC430_STATE_TX_UNDERFLOW         (0x70)
+#define CC430_STATE_MASK                 (0x70)
+#define CC430_FIFO_BYTES_AVAILABLE_MASK  (0x0F)
+#define CC430_STATE_RX                   (0x10)
+#define CC430_STATE_RX_OVERFLOW          (0x60)
+
   switch(RF1AIV) {                          // Prioritizing Radio Core Interrupt
   case  0: break;                           // No RF core interrupt pending
   case  2: break;                           // RFIFG0
@@ -455,25 +463,38 @@ void CC1101_ISR(void)
   case 16: break;                           // RFIFG7
   case 18: break;                           // RFIFG8
   case 20:                                  // RFIFG9
-    
+
     if(rf_receiving) {                      // RX end of packet
       unsigned char x;
+#if 0
+      unsigned char RxStatus;
 
+      // Which state?
+      RxStatus = Strobe(RF_SNOP);
+
+      // trap
+      if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_RX &&
+          (RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
+        while(1);
+      }
+#endif
       // Mark as not receiving to re-enable receiving fully
       // FIXME: would something less be enough?
       rf_receiving = 0;
 
       // Read the length byte from the FIFO
       RfRxBufferLength = ReadSingleReg(RXBYTES);
+
+      // Must have at least 4 bytes (len <payload> RSSI CRC)
+      if (RfRxBufferLength < 4) {
+        RfRxBufferLength = 0;
+        return;
+      }
+
       ReadBurstReg(RF_RXFIFORD, RfRxBuffer, RfRxBufferLength);
 
       // Stop here to see contents of RxBuffer
       __no_operation();
-
-
-      // Testing: heavier off
-      // This seems to be needed at least in some error cases
-      RfReceiveOff();
 
 #if 1
       // Check the CRC results
@@ -603,6 +624,17 @@ int sc_itoa(int value, unsigned char *str, int len)
 }
 
 
+
+/*
+ * Sleep ms milliseconds.
+ */
+void sleep_ms(int ms)
+{
+  int a;
+  for (a = 0; a < ms; a++) {
+    __delay_cycles(1000);
+  }
+}
 
 /* Emacs indentatation information
    Local Variables:

@@ -20,7 +20,7 @@
 
 #define UART_TXRX_SWAP                         // Swap TX & RX
 #define USE_DEBUG_LEDS     (2)                 // 1 debug led
-#define SC_USE_SLEEP       (1)                 // Use sleep instead busyloop
+#define SC_USE_SLEEP       (0)                 // Use sleep instead busyloop
 
 #ifdef USE_DEBUG_LEDS
 #if (USE_DEBUG_LEDS >= 1)
@@ -58,6 +58,7 @@ unsigned char RfTxBuffer[PACKET_LEN];
 unsigned char RfTxBuffer_i = 1;
 unsigned char data_to_send = 0;
 unsigned int i = 0;
+unsigned char rf_rx_error = 0;
 
 unsigned char rf_transmitting = 0;
 unsigned char rf_receiving = 0;
@@ -76,7 +77,7 @@ int main(void)
   InitLeds();
 
 #if SC_USE_SLEEP == 0
-  __bis_SR_register(GIE);                   // Enable interrupts
+  __bis_status_register(GIE);               // Enable interrupts
 #endif
   __no_operation();                         // For debugger
 
@@ -84,7 +85,14 @@ int main(void)
     led_toggle(1);
 
     if(!rf_transmitting && !rf_receiving) { // If not sending nor listening, start listening
+
       RfReceiveOff();
+
+      if (rf_rx_error) {
+        ResetRadioCore();
+        //sleep_ms(100);
+        rf_rx_error = 0;
+      }
       /*
       sleep_ms(1);
       InitRadio();
@@ -94,7 +102,7 @@ int main(void)
     }
 
 #if SC_USE_SLEEP == 1
-    __bis_SR_register(LPM0_bits + GIE);     // Sleep while waiting for interrupt
+    __bis_status_register(LPM0_bits + GIE);     // Sleep while waiting for interrupt
     __no_operation();
 #else
     sleep_ms(1);
@@ -117,6 +125,8 @@ int send_next_msg(void)
   signed char x;
   signed char len = -1;
 
+  __bic_status_register(GIE);                   // Disable interrupts
+
   // Find the end of the first message
   for (x = 0; x < data_to_send; x++) {
     if (UartRxBuffer[x] == '\n') {
@@ -129,6 +139,7 @@ int send_next_msg(void)
   if (len == -1) {
     data_to_send = 0;
     UartRxBuffer_i = 0;
+    __bis_status_register(GIE);                 // Enable interrupts
     return 1;
   }
 
@@ -138,8 +149,6 @@ int send_next_msg(void)
   for (x = 0; x < len; ++x) {
     RfTxBuffer[x+1] = UartRxBuffer[x];
   }
-
-  // FIXME: disable interrupts?
 
   // If we have more data to send, move them in front of the buffer
   if (len != UartRxBuffer_i) {
@@ -153,19 +162,19 @@ int send_next_msg(void)
     data_to_send = 0;
   }
 
-  // FIXME: enable interrupts?
-
   // Stop receive mode
   if (rf_receiving) {
     RfReceiveOff();
     rf_receiving = 0;
-    sleep_ms(1);
+    //sleep_ms(1);
   }
 
   // Send buffer over RF (len +1 for length byte)
   rf_transmitting = 1;
   RfTransmit((unsigned char*)RfTxBuffer, RfTxBuffer[0] + 1);
   led_on(2);
+
+  __bis_status_register(GIE);                   // Enable interrupts
 
   return 0;
 }
@@ -466,27 +475,36 @@ void CC1101_ISR(void)
 
     if(rf_receiving) {                      // RX end of packet
       unsigned char x;
-#if 0
+
+      // Mark as not receiving to re-enable receiving fully
+      // FIXME: would something less be enough?
+      rf_receiving = 0;
+#if 1
       unsigned char RxStatus;
 
       // Which state?
       RxStatus = Strobe(RF_SNOP);
 
+      // Should always be idle
+      if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
+        rf_rx_error = 1;
+        return;
+      }
+#if 0
       // trap
       if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_RX &&
           (RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
         while(1);
       }
 #endif
-      // Mark as not receiving to re-enable receiving fully
-      // FIXME: would something less be enough?
-      rf_receiving = 0;
+#endif
 
       // Read the length byte from the FIFO
       RfRxBufferLength = ReadSingleReg(RXBYTES);
 
       // Must have at least 4 bytes (len <payload> RSSI CRC)
       if (RfRxBufferLength < 4) {
+        rf_rx_error = 1;
         RfRxBufferLength = 0;
         return;
       }
@@ -501,6 +519,7 @@ void CC1101_ISR(void)
       if(!(RfRxBuffer[RfRxBufferLength - 1] & CRC_OK)) {
         // CRC error, discard data
         RfRxBufferLength = 0;
+        rf_rx_error = 1;
         return;
       }
 #endif

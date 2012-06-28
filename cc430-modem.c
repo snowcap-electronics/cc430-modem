@@ -92,6 +92,7 @@ int main(void)
   __no_operation();                         // For debugger
 
   while (1) {
+    unsigned char RxStatus;
     led_toggle(1);
 
     if(!rf_transmitting && !rf_receiving) { // If not sending nor listening, start listening
@@ -105,15 +106,11 @@ int main(void)
         rf_rx_error = 0;
       }
 
-      {
-        // Wait until idle
-        unsigned char RxStatus;
-
-        // Which state?
-        while (((RxStatus = Strobe(RF_SNOP)) & CC430_STATE_MASK) != CC430_STATE_IDLE) {
-          sleep_ms(1);
-        }
+      // Wait until idle
+      while (((RxStatus = Strobe(RF_SNOP)) & CC430_STATE_MASK) != CC430_STATE_IDLE) {
+        sleep_ms(1);
       }
+
       rf_receiving = 1;
       RfReceiveOn();
     }

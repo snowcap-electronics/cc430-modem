@@ -35,6 +35,16 @@
 #endif
 #endif
 
+
+#define CC430_STATE_TX                   (0x20)
+#define CC430_STATE_IDLE                 (0x00)
+#define CC430_STATE_TX_UNDERFLOW         (0x70)
+#define CC430_STATE_MASK                 (0x70)
+#define CC430_FIFO_BYTES_AVAILABLE_MASK  (0x0F)
+#define CC430_STATE_RX                   (0x10)
+#define CC430_STATE_RX_OVERFLOW          (0x60)
+
+
 extern RF_SETTINGS rfSettings;
 
 unsigned char packetReceived;
@@ -89,14 +99,21 @@ int main(void)
       RfReceiveOff();
 
       if (rf_rx_error) {
+        sleep_ms(1);
         ResetRadioCore();
-        //sleep_ms(100);
+        InitRadio();
         rf_rx_error = 0;
       }
-      /*
-      sleep_ms(1);
-      InitRadio();
-      */
+
+      {
+        // Wait until idle
+        unsigned char RxStatus;
+
+        // Which state?
+        while (((RxStatus = Strobe(RF_SNOP)) & CC430_STATE_MASK) != CC430_STATE_IDLE) {
+          sleep_ms(1);
+        }
+      }
       rf_receiving = 1;
       RfReceiveOn();
     }
@@ -452,14 +469,6 @@ void USCI_A0_ISR(void)
 __attribute__((interrupt(CC1101_VECTOR)))
 void CC1101_ISR(void)
 {
-#define CC430_STATE_TX                   (0x20)
-#define CC430_STATE_IDLE                 (0x00)
-#define CC430_STATE_TX_UNDERFLOW         (0x70)
-#define CC430_STATE_MASK                 (0x70)
-#define CC430_FIFO_BYTES_AVAILABLE_MASK  (0x0F)
-#define CC430_STATE_RX                   (0x10)
-#define CC430_STATE_RX_OVERFLOW          (0x60)
-
   switch(RF1AIV) {                          // Prioritizing Radio Core Interrupt
   case  0: break;                           // No RF core interrupt pending
   case  2: break;                           // RFIFG0
@@ -488,7 +497,7 @@ void CC1101_ISR(void)
       // Should always be idle
       if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
         rf_rx_error = 1;
-        return;
+        break;
       }
 #if 0
       // trap
@@ -506,7 +515,7 @@ void CC1101_ISR(void)
       if (RfRxBufferLength < 4) {
         rf_rx_error = 1;
         RfRxBufferLength = 0;
-        return;
+        break;
       }
 
       ReadBurstReg(RF_RXFIFORD, RfRxBuffer, RfRxBufferLength);
@@ -520,12 +529,12 @@ void CC1101_ISR(void)
         // CRC error, discard data
         RfRxBufferLength = 0;
         rf_rx_error = 1;
-        return;
+        break;
       }
 #endif
       // If there's not enough space for new data in uart tx buffer, discard new data
       if (UartTxBufferLength + (RfRxBufferLength - 3) > UART_BUF_LEN) {
-        return;
+        break;
       }
 
       // Append the RF RX buffer to Uart TX, skipping the length byte, RSSI and CRC/Quality
@@ -581,7 +590,11 @@ void CC1101_ISR(void)
   case 28: break;                           // RFIFG13
   case 30: break;                           // RFIFG14
   case 32: break;                           // RFIFG15
-  }  
+  }
+
+  // Make sure we reset the radio
+  rf_receiving = 0;
+
 #if SC_USE_SLEEP == 1
   __bic_SR_register_on_exit(LPM3_bits);     // Exit active
 #endif

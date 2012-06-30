@@ -20,7 +20,7 @@
 
 #define UART_TXRX_SWAP                         // Swap TX & RX
 #define USE_DEBUG_LEDS     (2)                 // 1 debug led
-#define SC_USE_SLEEP       (0)                 // Use sleep instead busyloop
+#define SC_USE_SLEEP       (1)                 // Use sleep instead busyloop
 
 #ifdef USE_DEBUG_LEDS
 #if (USE_DEBUG_LEDS >= 1)
@@ -67,8 +67,7 @@ unsigned char RfRxBufferLength = 0;
 unsigned char RfTxBuffer[PACKET_LEN];
 unsigned char RfTxBuffer_i = 1;
 unsigned char data_to_send = 0;
-unsigned int i = 0;
-unsigned char rf_rx_error = 0;
+unsigned char rf_error = 0;
 
 unsigned char rf_transmitting = 0;
 unsigned char rf_receiving = 0;
@@ -87,23 +86,25 @@ int main(void)
   InitLeds();
 
 #if SC_USE_SLEEP == 0
-  __bis_status_register(GIE);               // Enable interrupts
+  // Enable interrupts
+  __bis_status_register(GIE);
 #endif
-  __no_operation();                         // For debugger
 
   while (1) {
-    unsigned char RxStatus;
+
     led_toggle(1);
 
-    if(!rf_transmitting && !rf_receiving) { // If not sending nor listening, start listening
+    // If not sending nor listening, start listening
+    if(!rf_transmitting && !rf_receiving) {
+      unsigned char RxStatus;
 
       RfReceiveOff();
 
-      if (rf_rx_error) {
-        sleep_ms(1);
+      // Reset radio on error
+      if (rf_error) {
         ResetRadioCore();
         InitRadio();
-        rf_rx_error = 0;
+        rf_error = 0;
       }
 
       // Wait until idle
@@ -111,18 +112,20 @@ int main(void)
         sleep_ms(1);
       }
 
+      // Start listening
       rf_receiving = 1;
       RfReceiveOn();
     }
 
 #if SC_USE_SLEEP == 1
-    __bis_status_register(LPM0_bits + GIE);     // Sleep while waiting for interrupt
-    __no_operation();
+    // Sleep while waiting for interrupt
+    __bis_status_register(LPM0_bits + GIE);
 #else
     sleep_ms(1);
 #endif
 
-    if (!rf_transmitting && data_to_send) { // We have data to send over RF
+    // We have data to send over RF
+    if (!rf_transmitting && data_to_send) {
       if (!send_next_msg()) {
         continue;
       }
@@ -139,7 +142,8 @@ int send_next_msg(void)
   signed char x;
   signed char len = -1;
 
-  __bic_status_register(GIE);                   // Disable interrupts
+  // Disable interrupts
+  __bic_status_register(GIE);
 
   // Find the end of the first message
   for (x = 0; x < data_to_send; x++) {
@@ -153,7 +157,8 @@ int send_next_msg(void)
   if (len == -1) {
     data_to_send = 0;
     UartRxBuffer_i = 0;
-    __bis_status_register(GIE);                 // Enable interrupts
+    // Enable interrupts
+    __bis_status_register(GIE);
     return 1;
   }
 
@@ -180,7 +185,6 @@ int send_next_msg(void)
   if (rf_receiving) {
     RfReceiveOff();
     rf_receiving = 0;
-    //sleep_ms(1);
   }
 
   // Send buffer over RF (len +1 for length byte)
@@ -188,7 +192,8 @@ int send_next_msg(void)
   RfTransmit((unsigned char*)RfTxBuffer, RfTxBuffer[0] + 1);
   led_on(2);
 
-  __bis_status_register(GIE);                   // Enable interrupts
+  // Enable interrupts
+  __bis_status_register(GIE);
 
   return 0;
 }
@@ -355,13 +360,19 @@ void InitUart(void)
  */
 void RfTransmit(unsigned char *buffer, unsigned char length)
 {
+  // Falling edge of RFIFG9
   RF1AIES |= BIT9;
-  RF1AIFG &= ~BIT9;                         // Clear pending interrupts
-  RF1AIE |= BIT9;                           // Enable TX end-of-packet interrupt
+
+  // Clear pending interrupts
+  RF1AIFG &= ~BIT9;
+
+  // Enable TX end-of-packet interrupt
+  RF1AIE |= BIT9;
 
   WriteBurstReg(RF_TXFIFOWR, buffer, length);
 
-  Strobe(RF_STX);                           // Strobe STX
+  // Start transmit
+  Strobe(RF_STX);
 }
 
 
@@ -371,9 +382,14 @@ void RfTransmit(unsigned char *buffer, unsigned char length)
  */
 void RfReceiveOn(void)
 {  
-  RF1AIES |= BIT9;                          // Falling edge of RFIFG9
-  RF1AIFG &= ~BIT9;                         // Clear a pending interrupt
-  RF1AIE  |= BIT9;                          // Enable the interrupt
+  // Falling edge of RFIFG9
+  RF1AIES |= BIT9;
+
+  // Clear a pending interrupt
+  RF1AIFG &= ~BIT9;
+
+  // Enable the interrupt
+  RF1AIE  |= BIT9;
 
   // Radio is in IDLE following a TX, so strobe SRX to enter Receive Mode
   Strobe(RF_SRX);
@@ -386,8 +402,11 @@ void RfReceiveOn(void)
  */
 void RfReceiveOff(void)
 {
-  RF1AIE &= ~BIT9;                          // Disable RX interrupts
-  RF1AIFG &= ~BIT9;                         // Clear pending IFG
+  // Disable RX interrupts
+  RF1AIE &= ~BIT9;
+
+  // Clear pending IFG
+  RF1AIFG &= ~BIT9;
 
   // It is possible that ReceiveOff is called while radio is receiving a packet.
   // Therefore, it is necessary to flush the RX FIFO after issuing IDLE strobe
@@ -404,39 +423,16 @@ void RfReceiveOff(void)
 __attribute__((interrupt(USCI_A0_VECTOR)))
 void USCI_A0_ISR(void)
 {
-  unsigned char tmpchar;
 
   switch(UCA0IV) {
   case 0: break;                            // Vector 0 - no interrupt
   case 2:                                   // Vector 2 - RXIFG
-    tmpchar = UCA0RXBUF;
-
-    if (tmpchar == '\r') {                  // Replace \r with \n
-      tmpchar = '\n';
-    }
-
-    // Ignore "empty" messages, i.e. pure newlines
-    if (tmpchar == '\n' && UartRxBuffer_i == 0) {
-      return;
-    }
-
-    UartRxBuffer[UartRxBuffer_i++] = tmpchar;// Store received byte
-    if (tmpchar == '\n') {                  // Check for full message
-
-      data_to_send = UartRxBuffer_i;        // Flag ready to send
-
+    if (handle_uart_rx_byte()) {
 #if SC_USE_SLEEP == 1
-      __bic_SR_register_on_exit(LPM3_bits); // Exit active
+      // Exit active
+      __bic_SR_register_on_exit(LPM3_bits);
 #endif
-
-      return;
     }
-
-    if (UartRxBuffer_i > UART_BUF_LEN) {    // Check for RX full buffer
-      UartRxBuffer_i = 0;                   // Discard the RX buffer
-      return;
-    }
-
     break;
   case 4:                                   // Vector 4 - TXIFG
     if (UartTxBufferLength == 0) {          // Spurious interrupt (or a workaround for a bug)?
@@ -458,7 +454,44 @@ void USCI_A0_ISR(void)
   }
 }
 
+/*
+ * Called from interrupt handler to handle the received byte over uart
+ */
+int handle_uart_rx_byte(void)
+{
+  unsigned char tmpchar;
 
+  tmpchar = UCA0RXBUF;
+
+  // Replace \r with \n
+  if (tmpchar == '\r') {
+    tmpchar = '\n';
+  }
+
+  // Ignore "empty" messages, i.e. pure newlines
+  if (tmpchar == '\n' && UartRxBuffer_i == 0) {
+    return 0;
+  }
+
+  // Store received byte
+  UartRxBuffer[UartRxBuffer_i++] = tmpchar;
+
+  // Check for a full message
+  if (tmpchar == '\n') {
+
+    // Flag ready to send over RF
+    data_to_send = UartRxBuffer_i;
+
+    return 1;
+  }
+ 
+  // Discard the whole RX buffer, when full buffer
+  if (UartRxBuffer_i > UART_BUF_LEN) {
+    UartRxBuffer_i = 0;
+  }
+
+  return 0;
+}
 
 /*
  * RF TX or RX ready (one whole message)
@@ -479,107 +512,19 @@ void CC1101_ISR(void)
   case 18: break;                           // RFIFG8
   case 20:                                  // RFIFG9
 
-    if(rf_receiving) {                      // RX end of packet
-      unsigned char x;
+    // Disable RFIFG9 interrupts
+    RF1AIE &= ~BIT9;
 
-      // Mark as not receiving to re-enable receiving fully
-      // FIXME: would something less be enough?
-      rf_receiving = 0;
-#if 1
-      unsigned char RxStatus;
+    // RX end of packet
+    if(rf_receiving) {
+      handle_rf_rx_packet();
+    }
 
-      // Which state?
-      RxStatus = Strobe(RF_SNOP);
-
-      // Should always be idle
-      if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
-        rf_rx_error = 1;
-        break;
-      }
-#if 0
-      // trap
-      if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_RX &&
-          (RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
-        while(1);
-      }
-#endif
-#endif
-
-      // Read the length byte from the FIFO
-      RfRxBufferLength = ReadSingleReg(RXBYTES);
-
-      // Must have at least 4 bytes (len <payload> RSSI CRC)
-      if (RfRxBufferLength < 4) {
-        rf_rx_error = 1;
-        RfRxBufferLength = 0;
-        break;
-      }
-
-      ReadBurstReg(RF_RXFIFORD, RfRxBuffer, RfRxBufferLength);
-
-      // Stop here to see contents of RxBuffer
-      __no_operation();
-
-#if 1
-      // Check the CRC results
-      if(!(RfRxBuffer[RfRxBufferLength - 1] & CRC_OK)) {
-        // CRC error, discard data
-        RfRxBufferLength = 0;
-        rf_rx_error = 1;
-        break;
-      }
-#endif
-      // If there's not enough space for new data in uart tx buffer, discard new data
-      if (UartTxBufferLength + (RfRxBufferLength - 3) > UART_BUF_LEN) {
-        break;
-      }
-
-      // Append the RF RX buffer to Uart TX, skipping the length byte, RSSI and CRC/Quality
-      for (x = 0; x < RfRxBufferLength - 3; ++x) {
-        UartTxBuffer[UartTxBufferLength + x] = RfRxBuffer[x+1];
-      }
-      UartTxBufferLength += (RfRxBufferLength - 3);
-
-      {
-        // DEBUG: Write RSSI to UartTxBuffer
-        char len;
-        unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
-        unsigned char value = RfRxBuffer[RfRxBufferLength - 2];
-        unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
-        len = sc_itoa(value, buf, max_len);
-        if (len == 0) {
-          UartTxBuffer[UartTxBufferLength] = 'X';
-          ++len;
-        }
-        UartTxBuffer[UartTxBufferLength + len++] = ' ';
-        UartTxBufferLength += len;
-      }
-
-      {
-        // DEBUG: Write CRC/LQI to UartTxBuffer
-        char len;
-        unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
-        unsigned char value = RfRxBuffer[RfRxBufferLength - 1];
-        unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
-        len = sc_itoa(value, buf, max_len);
-        if (len == 0) {
-          UartTxBuffer[UartTxBufferLength] = 'X';
-          ++len;
-        }
-        UartTxBuffer[UartTxBufferLength + len++] = '\n';
-        UartTxBufferLength += len;
-      }
-
-      // Send the first byte to Uart
-      //while (!(UCA0IFG&UCTXIFG));           // USCI_A0 TX buffer ready?
-      UCA0TXBUF = UartTxBuffer[UartTxBuffer_i]; // Send first byte
-
-    } else if(rf_transmitting) {            // RF TX end of packet
-      RF1AIE &= ~BIT9;                      // Disable RF TX end-of-packet interrupt
+    // RF TX end of packet
+    if(rf_transmitting) {
       led_off(2);
       rf_transmitting = 0;
     }
-    //else while(1); 			                    // trap
     break;
   case 22: break;                           // RFIFG10
   case 24: break;                           // RFIFG11
@@ -589,15 +534,101 @@ void CC1101_ISR(void)
   case 32: break;                           // RFIFG15
   }
 
-  // Make sure we reset the radio
-  rf_receiving = 0;
-
 #if SC_USE_SLEEP == 1
   __bic_SR_register_on_exit(LPM3_bits);     // Exit active
 #endif
 }
 
 
+
+/*
+ * Called from interrupt handler to handle a received packet from radio
+ */
+void handle_rf_rx_packet(void)
+{
+  unsigned char x;
+  unsigned char RxStatus;
+
+  // Radio is in IDLE after receiving a message (See MCSM0 default values)
+  rf_receiving = 0;
+
+  // Validate radio state
+  RxStatus = Strobe(RF_SNOP);
+  if ((RxStatus & CC430_STATE_MASK) != CC430_STATE_IDLE) {
+    rf_error = 1;
+    goto rx_error;
+  }
+
+  // Read the length byte from the FIFO
+  RfRxBufferLength = ReadSingleReg(RXBYTES);
+
+  // FIXME: assuming +\n is not generic
+  // Must have at least 5 bytes (len <payload> \n RSSI CRC) for a valid packet
+  if (RfRxBufferLength < 5) {
+    goto rx_error;
+  }
+
+  // Read the packet data
+  ReadBurstReg(RF_RXFIFORD, RfRxBuffer, RfRxBufferLength);
+
+  // Verify CRC
+  if(!(RfRxBuffer[RfRxBufferLength - 1] & CRC_OK)) {
+    goto rx_error;
+  }
+
+  // If there's not enough space for new data in uart tx buffer, discard new data
+  if (UartTxBufferLength + (RfRxBufferLength - 3) > UART_BUF_LEN) {
+    goto failed_to_receive;
+  }
+
+  // Append the RF RX buffer to Uart TX, skipping the length, RSSI and CRC/Quality bytes
+  for (x = 0; x < RfRxBufferLength - 3; ++x) {
+    UartTxBuffer[UartTxBufferLength + x] = RfRxBuffer[x+1];
+  }
+  UartTxBufferLength += (RfRxBufferLength - 3);
+
+  {
+    // DEBUG: Write RSSI to UartTxBuffer
+    char len;
+    unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
+    unsigned char value = RfRxBuffer[RfRxBufferLength - 2];
+    unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
+    len = sc_itoa(value, buf, max_len);
+    if (len == 0) {
+      UartTxBuffer[UartTxBufferLength] = 'X';
+      ++len;
+    }
+    UartTxBuffer[UartTxBufferLength + len++] = ' ';
+    UartTxBufferLength += len;
+  }
+
+  {
+    // DEBUG: Write CRC/LQI to UartTxBuffer
+    char len;
+    unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
+    unsigned char value = RfRxBuffer[RfRxBufferLength - 1];
+    unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
+    len = sc_itoa(value, buf, max_len);
+    if (len == 0) {
+      UartTxBuffer[UartTxBufferLength] = 'X';
+      ++len;
+    }
+    UartTxBuffer[UartTxBufferLength + len++] = '\n';
+    UartTxBufferLength += len;
+  }
+
+  // Send the first byte to Uart
+  //while (!(UCA0IFG&UCTXIFG));           // USCI_A0 TX buffer ready?
+  UCA0TXBUF = UartTxBuffer[UartTxBuffer_i]; // Send first byte
+  return;
+
+ rx_error:
+  rf_error = 1;
+
+ failed_to_receive:
+  RfRxBufferLength = 0;
+  return;
+}
 
 /*
  * Convert int to string. Returns length on the converted string

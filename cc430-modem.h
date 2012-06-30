@@ -19,3 +19,5 @@ void led_off(int led);
 void led_on(int led);
 int sc_itoa(int value, unsigned char *str, int len);
 void sleep_ms(int ms);
+void handle_rf_rx_packet(void);
+int handle_uart_rx_byte(void);

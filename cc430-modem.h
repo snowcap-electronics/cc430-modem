@@ -21,3 +21,5 @@ int sc_itoa(int value, unsigned char *str, int len);
 void sleep_ms(int ms);
 void handle_rf_rx_packet(void);
 int handle_uart_rx_byte(void);
+void timer_set(int ms);
+void timer_clear(void);

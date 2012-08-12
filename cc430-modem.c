@@ -35,6 +35,7 @@
 #endif
 #endif
 
+#define UART_RX_NEWDATA_TIMEOUT_MS       4     // 4ms timeout for sending current uart rx data
 
 #define CC430_STATE_TX                   (0x20)
 #define CC430_STATE_IDLE                 (0x00)
@@ -58,6 +59,7 @@ unsigned char UartRxBuffer_i = 0;
 unsigned char UartTxBuffer[UART_BUF_LEN];
 unsigned char UartTxBuffer_i = 0;
 unsigned char UartTxBufferLength = 0;
+unsigned char uart_rx_timeout = 0;
 
 // Buffer for incoming data from RF
 unsigned char RfRxBuffer[PACKET_LEN];
@@ -85,10 +87,8 @@ int main(void)
   InitRadio();
   InitLeds();
 
-#if SC_USE_SLEEP == 0
   // Enable interrupts
   __bis_status_register(GIE);
-#endif
 
   while (1) {
 
@@ -142,19 +142,25 @@ int send_next_msg(void)
   signed char x;
   signed char len = -1;
 
-  // Disable interrupts
+  // Disable interrupts to make sure UartRxBuffer isn't modified in the middle
   __bic_status_register(GIE);
 
-  // Find the end of the first message
-  for (x = 0; x < data_to_send; x++) {
-    if (UartRxBuffer[x] == '\n') {
-      len = x + 1;
-      break;
+  // On UART RX timeout, send all data in UART RX buffer
+  if (uart_rx_timeout == 1) {
+    len = UartRxBuffer_i;
+    uart_rx_timeout = 0;
+  } else {
+    // Find the end of the first message
+    for (x = 0; x < data_to_send; x++) {
+      if (UartRxBuffer[x] == '\n') {
+        len = x + 1;
+        break;
+      }
     }
   }
 
-  // ERROR: no newline, empty uart buffers, do nothing
-  if (len == -1) {
+  // ERROR: no newline or empty uart buffers, do nothing
+  if (len == 0 || len == -1) {
     data_to_send = 0;
     UartRxBuffer_i = 0;
     // Enable interrupts
@@ -461,15 +467,13 @@ int handle_uart_rx_byte(void)
 {
   unsigned char tmpchar;
 
+  // Clear possible pending timer for new data
+  timer_clear();
+
   tmpchar = UCA0RXBUF;
 
-  // Replace \r with \n
-  if (tmpchar == '\r') {
-    tmpchar = '\n';
-  }
-
-  // Ignore "empty" messages, i.e. pure newlines
-  if (tmpchar == '\n' && UartRxBuffer_i == 0) {
+  // Discard the byte if buffer already full
+  if (UartRxBuffer_i == UART_BUF_LEN) {
     return 0;
   }
 
@@ -484,11 +488,9 @@ int handle_uart_rx_byte(void)
 
     return 1;
   }
- 
-  // Discard the whole RX buffer, when full buffer
-  if (UartRxBuffer_i > UART_BUF_LEN) {
-    UartRxBuffer_i = 0;
-  }
+
+  // Set timer for new data. Send current data after timeout
+  timer_set(UART_RX_NEWDATA_TIMEOUT_MS);
 
   return 0;
 }
@@ -694,6 +696,50 @@ void sleep_ms(int ms)
   for (a = 0; a < ms; a++) {
     __delay_cycles(1000);
   }
+}
+
+
+
+/*
+ * Timeout, send data currently in the UART RX buffer
+ */
+__attribute__((interrupt(TIMER1_A0_VECTOR)))
+void TIMER1_A0_ISR(void)
+{
+  timer_clear();
+  if (UartRxBuffer_i > 0) {
+    data_to_send = 1;
+    uart_rx_timeout = 1;
+  }
+}
+
+
+
+/*
+ * Set timer to raise an interrupt after ms milliseconds
+ * NOTE: ms must < 512
+ */
+void timer_set(int ms)
+{
+  if (ms > 195) {
+    ms = 195;
+  }
+
+  TA1CCR0  = ms << 7;                       // ms milliseconds
+  TA1CTL = TASSEL_2 + MC_1 + ID_3;          // SMCLK/8, upmode
+  TA1CCTL0 = CCIE;                          // CCR0 interrupt enabled
+}
+
+
+
+/*
+ * Set timer to raise an interrupt after ms milliseconds
+ */
+void timer_clear(void)
+{
+  // Clear timer register, disable timer interrupts
+  TA1CTL = TACLR;
+  uart_rx_timeout = 0;
 }
 
 /* Emacs indentatation information

@@ -12,30 +12,31 @@
  ******************************************************************************/
 #include "cc430-modem.h"
 
-#define PAYLOAD_LEN        (32)                // Max payload
+#define PAYLOAD_LEN        (60)                // Max payload
 #define PACKET_LEN         (PAYLOAD_LEN + 3)   // PACKET_LEN = payload + len + RSSI + LQI
-#define UART_BUF_LEN       (PAYLOAD_LEN*3)     // Bigger buffers for uart (MAX: 127)
+#define UART_BUF_LEN       (PAYLOAD_LEN * 3)   // Bigger buffers for uart
 #define CRC_OK             (BIT7)              // CRC_OK bit
+//#define PATABLE_VAL        (0xC3)              // +10 dBm output
 #define PATABLE_VAL        (0x51)              // 0 dBm output
 
-#define UART_TXRX_SWAP                         // Swap TX & RX
-#define USE_DEBUG_LEDS     (2)                 // 1 debug led
-#define SC_USE_SLEEP       (1)                 // Use sleep instead busyloop
+#define USE_DEBUG_LEDS     1                   // No of debug leds
+#define SC_USE_SLEEP       1                   // Use sleep instead busyloop
 
 #ifdef USE_DEBUG_LEDS
 #if (USE_DEBUG_LEDS >= 1)
-#define DEBUG_LED1_POUT     P1OUT
-#define DEBUG_LED1_PDIR     P1DIR
-#define DEBUG_LED1_BIT      BIT0               // P1.0, GPIO in RBv1
+#define DEBUG_LED1_POUT    P2OUT
+#define DEBUG_LED1_PDIR    P2DIR
+#define DEBUG_LED1_BIT     BIT6                // P2.6, GPIO in RBv1
 #endif
 #if (USE_DEBUG_LEDS == 2)
-#define DEBUG_LED2_POUT     P1OUT
-#define DEBUG_LED2_PDIR     P1DIR
-#define DEBUG_LED2_BIT      BIT4               // P1.4, SPI in RBv1
+#define DEBUG_LED2_POUT    P1OUT
+#define DEBUG_LED2_PDIR    P1DIR
+#define DEBUG_LED2_BIT     BIT2                // P1.2, SPI in RBv1
 #endif
 #endif
 
-#define UART_RX_NEWDATA_TIMEOUT_MS       4     // 4ms timeout for sending current uart rx data
+#define UART_RX_NEWDATA_TIMEOUT_MS       4   // 4ms timeout for sending current uart rx data
+//#define UART_RX_NEWDATA_TIMEOUT_MS       511   // 511ms timeout for sending current uart rx data
 
 #define CC430_STATE_TX                   (0x20)
 #define CC430_STATE_IDLE                 (0x00)
@@ -87,12 +88,14 @@ int main(void)
   InitRadio();
   InitLeds();
 
+#if SC_USE_SLEEP == 0
   // Enable interrupts
   __bis_status_register(GIE);
+#endif
 
   while (1) {
 
-    led_toggle(1);
+    led_toggle(2);
 
     // If not sending nor listening, start listening
     if(!rf_transmitting && !rf_receiving) {
@@ -139,8 +142,8 @@ int main(void)
 
 int send_next_msg(void)
 {
-  signed char x;
-  signed char len = -1;
+  unsigned char x;
+  int len = -1;
 
   // Disable interrupts to make sure UartRxBuffer isn't modified in the middle
   __bic_status_register(GIE);
@@ -196,7 +199,7 @@ int send_next_msg(void)
   // Send buffer over RF (len +1 for length byte)
   rf_transmitting = 1;
   RfTransmit((unsigned char*)RfTxBuffer, RfTxBuffer[0] + 1);
-  led_on(2);
+  led_on(1);
 
   // Enable interrupts
   __bis_status_register(GIE);
@@ -217,8 +220,8 @@ void led_toggle(int led)
   case 1:
 #if (USE_DEBUG_LEDS >= 1)
     DEBUG_LED1_POUT ^= DEBUG_LED1_BIT;
-    break;
 #endif
+    break;
   case 2:
 #if (USE_DEBUG_LEDS == 2)
     DEBUG_LED2_POUT ^= DEBUG_LED2_BIT;
@@ -332,22 +335,12 @@ void InitRadio(void)
 void InitUart(void)
 {
   PMAPPWD = 0x02D52;                        // Get write-access to port mapping regs
-#ifdef UART_TXRX_SWAP
-  P1MAP6 = PM_UCA0RXD;                      // Map UCA0RXD output to P1.6
-  P1MAP5 = PM_UCA0TXD;                      // Map UCA0TXD output to P1.5
-#else
   P1MAP5 = PM_UCA0RXD;                      // Map UCA0RXD output to P1.6
   P1MAP6 = PM_UCA0TXD;                      // Map UCA0TXD output to P1.5
-#endif
   PMAPPWD = 0;                              // Lock port mapping registers
 
-#ifdef UART_TXRX_SWAP
-  P1DIR |= BIT5;                            // Set P1.5 as TX output
-  P1SEL |= BIT5 + BIT6;                     // Select P1.5 & P1.6 to UART function
-#else
   P1DIR |= BIT6;                            // Set P1.6 as TX output
   P1SEL |= BIT5 + BIT6;                     // Select P1.5 & P1.6 to UART function
-#endif
 
   UCA0CTL1 |= UCSWRST;                      // **Put state machine in reset**
   UCA0CTL1 |= UCSSEL_2;                     // SMCLK
@@ -387,7 +380,7 @@ void RfTransmit(unsigned char *buffer, unsigned char length)
  * Turn on RF receiver
  */
 void RfReceiveOn(void)
-{  
+{
   // Falling edge of RFIFG9
   RF1AIES |= BIT9;
 
@@ -480,8 +473,8 @@ int handle_uart_rx_byte(void)
   // Store received byte
   UartRxBuffer[UartRxBuffer_i++] = tmpchar;
 
-  // Check for a full message
-  if (tmpchar == '\n') {
+  // Check for a full message or full buffer
+  if (tmpchar == '\n' || UartRxBuffer_i == UART_BUF_LEN) {
 
     // Flag ready to send over RF
     data_to_send = UartRxBuffer_i;
@@ -524,7 +517,7 @@ void CC1101_ISR(void)
 
     // RF TX end of packet
     if(rf_transmitting) {
-      led_off(2);
+      led_off(1);
       rf_transmitting = 0;
     }
     break;
@@ -564,9 +557,8 @@ void handle_rf_rx_packet(void)
   // Read the length byte from the FIFO
   RfRxBufferLength = ReadSingleReg(RXBYTES);
 
-  // FIXME: assuming +\n is not generic
-  // Must have at least 5 bytes (len <payload> \n RSSI CRC) for a valid packet
-  if (RfRxBufferLength < 5) {
+  // Must have at least 4 bytes (len <payload> RSSI CRC) for a valid packet
+  if (RfRxBufferLength < 4) {
     goto rx_error;
   }
 
@@ -591,7 +583,7 @@ void handle_rf_rx_packet(void)
 
   {
     // DEBUG: Write RSSI to UartTxBuffer
-    char len;
+    unsigned char len;
     unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
     unsigned char value = RfRxBuffer[RfRxBufferLength - 2];
     unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
@@ -606,7 +598,7 @@ void handle_rf_rx_packet(void)
 
   {
     // DEBUG: Write CRC/LQI to UartTxBuffer
-    char len;
+    unsigned char len;
     unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
     unsigned char value = RfRxBuffer[RfRxBufferLength - 1];
     unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
@@ -636,13 +628,13 @@ void handle_rf_rx_packet(void)
  * Convert int to string. Returns length on the converted string
  * (excluding the trailing \0) or 0 in error.
  */
-int sc_itoa(int value, unsigned char *str, int len)
+unsigned char sc_itoa(int value, unsigned char *str, unsigned char len)
 {
-  int index = len;
-  int extra, i;
-  int str_len;
-  int negative = 0;
-  int start = 0;
+  unsigned char index = len;
+  unsigned char extra, i;
+  unsigned char str_len;
+  unsigned char negative = 0;
+  unsigned char start = 0;
 
   // Check for negative values
   if (value < 0) {
@@ -708,8 +700,14 @@ void TIMER1_A0_ISR(void)
 {
   timer_clear();
   if (UartRxBuffer_i > 0) {
-    data_to_send = 1;
+    data_to_send = UartRxBuffer_i;
     uart_rx_timeout = 1;
+
+#if SC_USE_SLEEP == 1
+    // Exit active
+    __bic_SR_register_on_exit(LPM3_bits);
+#endif
+
   }
 }
 
@@ -738,6 +736,7 @@ void timer_set(int ms)
 void timer_clear(void)
 {
   // Clear timer register, disable timer interrupts
+  TA1CCTL0 = 0;                             // CCR0 interrupt disabled
   TA1CTL = TACLR;
   uart_rx_timeout = 0;
 }

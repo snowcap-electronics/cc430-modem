@@ -6,7 +6,7 @@ cc430 modem software acts as a wireless uart
 Features:
 * Buffers incoming uart and sends when
   - \n is received
-  - buffer (32 bytes) is full
+  - buffer (60 bytes) is full
   - no new data has been received in 4 milliseconds
 
 Currently adds also RSSI and LQI information as a separate line for

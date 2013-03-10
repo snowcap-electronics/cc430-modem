@@ -31,7 +31,7 @@
 #if (USE_DEBUG_LEDS == 2)
 #define DEBUG_LED2_POUT    P1OUT
 #define DEBUG_LED2_PDIR    P1DIR
-#define DEBUG_LED2_BIT     BIT2                // P1.2, SPI in RBv1
+#define DEBUG_LED2_BIT     BIT4                // P1.4, SPI in RBv1
 #endif
 #endif
 
@@ -80,6 +80,15 @@ unsigned char rf_receiving = 0;
 enum adc_state_t adc_state;
 uint16_t         adc_result;
 
+enum i2c_state_t i2c_state;
+
+unsigned char I2CTXByteCtr;
+unsigned char *I2CPTxData;                   // Pointer to TX data
+unsigned char *I2CPRxData;                   // Pointer to RX data
+unsigned char I2CRXByteCtr;
+volatile unsigned char I2CRxBuffer[16];      // Allocate 128 byte of RAM
+
+
 int main(void)
 {
   // Stop watchdog timer to prevent time out reset
@@ -93,11 +102,34 @@ int main(void)
   InitRadio();
   InitLeds();
   adc_shutdown();
+  i2c_init();
 
 #if SC_USE_SLEEP == 0
   // Enable interrupts
   __bis_status_register(GIE);
 #endif
+
+  // Set TMP275 to measuring mode
+  if (1) {
+    unsigned char tx_data[2];
+
+    /* Pointer to Configuration register */
+    tx_data[0] = 0x1;
+    /* Configuration:
+       Shutdown mode: 0
+       Thermostat mode: 0
+       Polarity: 0
+       Fault queue: 00
+       Resolution: 11 (12 bits)
+       One-shot: 0
+    */
+    tx_data[1] = 0b01100000;
+    i2c_send(tx_data, 2);
+
+    /* Set pointer to temperature register here so we can read without writing */
+    tx_data[0] = 0x0;
+    i2c_send(tx_data, 1);
+  }
 
   // Start timer. After 10 interrupts, ADC is started
   timer_set(100);
@@ -129,7 +161,7 @@ int main(void)
 
 #if SC_USE_SLEEP == 1
     // Sleep while waiting for interrupt
-    __bis_status_register(LPM3_bits + GIE);
+    __bis_status_register(LPM0_bits + GIE);
 #else
     sleep_ms(1);
 #endif
@@ -145,6 +177,23 @@ int main(void)
       UartRxBuffer[len++] = ':';
       UartRxBuffer[len++] = ' ';
       len += sc_itoa(adc_result, &UartRxBuffer[len], UART_BUF_LEN - len);
+      UartRxBuffer[len++] = '\r';
+      UartRxBuffer[len++] = '\n';
+      data_to_send = len;
+    }
+
+    if (i2c_state == I2C_READ_DATA) {
+      uint16_t temp;
+      unsigned char len = 0;
+
+      i2c_state = I2C_IDLE;
+
+      temp = i2c_read();
+
+      UartRxBuffer[len++] = 'T';
+      UartRxBuffer[len++] = ':';
+      UartRxBuffer[len++] = ' ';
+      len += sc_itoa(temp, &UartRxBuffer[len], UART_BUF_LEN - len);
       UartRxBuffer[len++] = '\r';
       UartRxBuffer[len++] = '\n';
       data_to_send = len;
@@ -450,7 +499,7 @@ void USCI_A0_ISR(void)
     if (handle_uart_rx_byte()) {
 #if SC_USE_SLEEP == 1
       // Exit active
-      __bic_SR_register_on_exit(LPM3_bits);
+      __bic_SR_register_on_exit(LPM0_bits);
 #endif
     }
     break;
@@ -551,7 +600,7 @@ void CC1101_ISR(void)
   }
 
 #if SC_USE_SLEEP == 1
-  __bic_SR_register_on_exit(LPM3_bits);     // Exit active
+  __bic_SR_register_on_exit(LPM0_bits);     // Exit active
 #endif
 }
 
@@ -724,10 +773,25 @@ void TIMER1_A0_ISR(void)
   static char count = 0;
   timer_clear();
 
-  if (++count == 10) {
-    count = 0;
-
+  ++count;
+  switch(count) {
+  case 5:
+    // It takes 300ms for tmp275 to read data. Read it 1Hz @ 500ms.
+    i2c_state = I2C_READ_DATA;
+#if SC_USE_SLEEP == 1
+    // Exit active
+    __bic_SR_register_on_exit(LPM0_bits);
+#endif
+    break;
+  case 10:
     adc_start(ADC_CHANNEL_BATTERY);
+    break;
+  default:
+    break;
+  }
+
+  if (count == 10) {
+    count = 0;
   }
 
   // Always set new timer
@@ -755,7 +819,7 @@ void ADC12_ISR(void)
 
 #if SC_USE_SLEEP == 1
       // Exit active
-      __bic_SR_register_on_exit(LPM3_bits);
+      __bic_SR_register_on_exit(LPM0_bits);
 #endif
       return;
     }
@@ -849,6 +913,115 @@ void adc_shutdown(void)
   ADC12CTL0 &= ~ADC12ENC;                     // Disable ADC
   ADC12CTL1 |= ADC12TCOFF;                    // Disable temperature sersor to save power
   // FIXME: turn off reference
+}
+
+
+/*
+ * I2C ISR
+ */
+__attribute__((interrupt(USCI_B0_VECTOR)))
+void USCI_B0_ISR(void)
+{
+  switch(UCB0IV) {
+  case  0: break;                           // Vector  0: No interrupts
+  case  2: break;                           // Vector  2: ALIFG
+  case  4: break;                           // Vector  4: NACKIFG
+  case  6: break;                           // Vector  6: STTIFG
+  case  8: break;                           // Vector  8: STPIFG
+  case 10: break;                           // Vector 10: RXIFG
+    I2CRXByteCtr--;                         // Decrement RX byte counter
+    if (I2CRXByteCtr) {
+      *I2CPRxData++ = UCB0RXBUF;            // Move RX data to address PRxData
+      if (I2CRXByteCtr == 1)                // Only one byte left?
+        UCB0CTL1 |= UCTXSTP;                // Generate I2C stop condition
+    } else {
+      *I2CPRxData = UCB0RXBUF;              // Move final RX data to PRxData
+      __bic_SR_register_on_exit(LPM0_bits); // Exit active CPU
+    }
+    break;
+  case 12:                                  // Vector 12: TXIFG
+    if (I2CTXByteCtr) {                     // Check TX byte counter
+      UCB0TXBUF = *I2CPTxData++;               // Load TX buffer
+      I2CTXByteCtr--;                       // Decrement TX byte counter
+    } else {
+      UCB0CTL1 |= UCTXSTP;                  // I2C stop condition
+      UCB0IFG &= ~UCTXIFG;                  // Clear USCI_B0 TX int flag
+      __bic_SR_register_on_exit(LPM0_bits); // Exit LPM0
+    }
+    break;
+  default: break;
+  }
+}
+
+
+
+/*
+ * Init i2c
+ */
+void i2c_init(void)
+{
+  i2c_state = I2C_IDLE;
+
+  PMAPPWD = 0x02D52;                        // Get write-access to port mapping regs
+  P1MAP3 = PM_UCB0SDA;                      // Map UCB0SDA output to P1.3
+  P1MAP2 = PM_UCB0SCL;                      // Map UCB0SCL output to P1.2
+  PMAPPWD = 0;                              // Lock port mapping registers
+
+  P1SEL |= BIT2 + BIT3;                     // Select P1.2 & P1.3 to I2C function
+
+  UCB0CTL1 |= UCSWRST;                      // Enable SW reset
+  UCB0CTL0 = UCMST + UCMODE_3 + UCSYNC;     // I2C Master, synchronous mode
+  UCB0CTL1 = UCSSEL_2 + UCSWRST;            // Use SMCLK, keep SW reset
+  UCB0BR0 = 12;                             // fSCL = SMCLK/12 = ~100kHz
+  UCB0BR1 = 0;
+  UCB0I2CSA = 0x4F;                         // TMP275 Slave Address is 04Fh
+  UCB0CTL1 &= ~UCSWRST;                     // Clear SW reset, resume operation
+  UCB0IE |= UCTXIE;                         // Enable TX interrupt
+
+}
+
+
+
+/*
+ * I2C send n bytes synchronously
+ */
+void i2c_send(unsigned char *buf, unsigned char bytes)
+{
+  while (1) {
+    __delay_cycles(50);                     // Delay required between transaction
+    I2CPTxData = buf;                       // TX array start address
+
+    I2CTXByteCtr = bytes;                   // Load TX byte counter
+
+    UCB0CTL1 |= UCTR + UCTXSTT;             // I2C TX, start condition
+
+    __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
+                                            // Remain in LPM0 until all data
+                                            // is TX'd
+    while (UCB0CTL1 & UCTXSTP);             // Ensure stop condition got sent
+  }
+
+}
+
+
+
+/*
+ * I2C read 2 bytes synchronously
+ */
+uint16_t i2c_read(void)
+{
+  while (1) {
+    I2CPRxData = (unsigned char *)I2CRxBuffer; // Start of RX buffer
+    I2CRXByteCtr = 2;                       // Load RX byte counter
+    while (UCB0CTL1 & UCTXSTP);             // Ensure stop condition got sent
+    UCB0CTL1 |= UCTXSTT;                    // I2C start condition
+
+    __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
+                                            // Remain in LPM0 until all data
+                                            // is RX'd
+  }
+
+  return ((I2CRxBuffer[0] << 8) | I2CRxBuffer[1]);
 }
 
 /* Emacs indentatation information

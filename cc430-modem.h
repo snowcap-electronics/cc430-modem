@@ -11,6 +11,11 @@ enum adc_state_t {
   ADC_DATA
 };
 
+enum i2c_state_t {
+  I2C_IDLE = 0,
+  I2C_READ_DATA
+};
+
 /*******************
  * Function Definition
  */
@@ -35,3 +40,6 @@ void timer_clear(void);
 
 void adc_start(unsigned char chan);
 void adc_shutdown(void);
+void i2c_init(void);
+void i2c_send(unsigned char *buf, unsigned char bytes);
+uint16_t i2c_read(void);

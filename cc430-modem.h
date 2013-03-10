@@ -2,6 +2,15 @@
 #include "RF1A.h"
 #include "hal_pmm.h"
 
+#include <stdint.h>
+
+enum adc_state_t {
+  ADC_IDLE = 0,
+  ADC_START_PENDING,
+  ADC_MEASURING,
+  ADC_DATA
+};
+
 /*******************
  * Function Definition
  */
@@ -23,3 +32,6 @@ void handle_rf_rx_packet(void);
 int handle_uart_rx_byte(void);
 void timer_set(int ms);
 void timer_clear(void);
+
+void adc_start(unsigned char chan);
+void adc_shutdown(void);

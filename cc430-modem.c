@@ -19,7 +19,7 @@
 //#define PATABLE_VAL        (0xC3)              // +10 dBm output
 #define PATABLE_VAL        (0x51)              // 0 dBm output
 
-#define USE_DEBUG_LEDS     1                   // No of debug leds
+#define USE_DEBUG_LEDS     2                   // No of debug leds
 #define SC_USE_SLEEP       1                   // Use sleep instead busyloop
 
 #ifdef USE_DEBUG_LEDS
@@ -37,6 +37,8 @@
 
 #define UART_RX_NEWDATA_TIMEOUT_MS       4   // 4ms timeout for sending current uart rx data
 //#define UART_RX_NEWDATA_TIMEOUT_MS       511   // 511ms timeout for sending current uart rx data
+
+#define ADC_CHANNEL_BATTERY              11 // (AVCC - AVSS) / 2
 
 #define CC430_STATE_TX                   (0x20)
 #define CC430_STATE_IDLE                 (0x00)
@@ -75,6 +77,9 @@ unsigned char rf_error = 0;
 unsigned char rf_transmitting = 0;
 unsigned char rf_receiving = 0;
 
+enum adc_state_t adc_state;
+uint16_t         adc_result;
+
 int main(void)
 {
   // Stop watchdog timer to prevent time out reset
@@ -87,15 +92,17 @@ int main(void)
   InitUart();
   InitRadio();
   InitLeds();
+  adc_shutdown();
 
 #if SC_USE_SLEEP == 0
   // Enable interrupts
   __bis_status_register(GIE);
 #endif
 
-  while (1) {
+  // Start timer. After 10 interrupts, ADC is started
+  timer_set(100);
 
-    led_toggle(2);
+  while (1) {
 
     // If not sending nor listening, start listening
     if(!rf_transmitting && !rf_receiving) {
@@ -122,16 +129,30 @@ int main(void)
 
 #if SC_USE_SLEEP == 1
     // Sleep while waiting for interrupt
-    __bis_status_register(LPM0_bits + GIE);
+    __bis_status_register(LPM3_bits + GIE);
 #else
     sleep_ms(1);
 #endif
 
+    // We have ADC data ready
+    if (adc_state == ADC_DATA) {
+      unsigned char len = 0;
+
+      adc_state = ADC_IDLE;
+      adc_init(); // or shutdown?
+
+      UartRxBuffer[len++] = 'B';
+      UartRxBuffer[len++] = ':';
+      UartRxBuffer[len++] = ' ';
+      len += sc_itoa(adc_result, &UartRxBuffer[len], UART_BUF_LEN - len);
+      UartRxBuffer[len++] = '\r';
+      UartRxBuffer[len++] = '\n';
+      data_to_send = len;
+    }
+
     // We have data to send over RF
     if (!rf_transmitting && data_to_send) {
-      if (!send_next_msg()) {
-        continue;
-      }
+      send_next_msg();
     }
   }
 
@@ -483,7 +504,7 @@ int handle_uart_rx_byte(void)
   }
 
   // Set timer for new data. Send current data after timeout
-  timer_set(UART_RX_NEWDATA_TIMEOUT_MS);
+  //timer_set(UART_RX_NEWDATA_TIMEOUT_MS);
 
   return 0;
 }
@@ -624,6 +645,8 @@ void handle_rf_rx_packet(void)
   return;
 }
 
+
+
 /*
  * Convert int to string. Returns length on the converted string
  * (excluding the trailing \0) or 0 in error.
@@ -698,24 +721,71 @@ void sleep_ms(int ms)
 __attribute__((interrupt(TIMER1_A0_VECTOR)))
 void TIMER1_A0_ISR(void)
 {
+  static char count = 0;
   timer_clear();
-  if (UartRxBuffer_i > 0) {
-    data_to_send = UartRxBuffer_i;
-    uart_rx_timeout = 1;
+
+  if (++count == 10) {
+    count = 0;
+
+    adc_start(ADC_CHANNEL_BATTERY);
+  }
+
+  // Always set new timer
+  timer_set(100);
+}
+
+
+
+/*
+ * ADC interrupt
+ */
+__attribute__((interrupt(ADC12_VECTOR)))
+void ADC12_ISR(void)
+{
+
+  led_toggle(2);
+  switch(ADC12IV) {
+  case  0: break;                           // Vector  0:  No interrupt
+  case  2: break;                           // Vector  2:  ADC overflow
+  case  4: break;                           // Vector  4:  ADC timing overflow
+  case  6:                                  // Vector  6:  ADC12IFG0
+    if (adc_state == ADC_MEASURING) {
+      adc_result = ADC12MEM0;
+      adc_state = ADC_DATA;
 
 #if SC_USE_SLEEP == 1
-    // Exit active
-    __bic_SR_register_on_exit(LPM3_bits);
+      // Exit active
+      __bic_SR_register_on_exit(LPM3_bits);
 #endif
+      return;
+    }
 
+    break;
+  case  8: break;                           // Vector  8:  ADC12IFG1
+  case 10: break;                           // Vector 10:  ADC12IFG2
+  case 12: break;                           // Vector 12:  ADC12IFG3
+  case 14: break;                           // Vector 14:  ADC12IFG4
+  case 16: break;                           // Vector 16:  ADC12IFG5
+  case 18: break;                           // Vector 18:  ADC12IFG6
+  case 20: break;                           // Vector 20:  ADC12IFG7
+  case 22: break;                           // Vector 22:  ADC12IFG8
+  case 24: break;                           // Vector 24:  ADC12IFG9
+  case 26: break;                           // Vector 26:  ADC12IFG10
+  case 28: break;                           // Vector 28:  ADC12IFG11
+  case 30: break;                           // Vector 30:  ADC12IFG12
+  case 32: break;                           // Vector 32:  ADC12IFG13
+  case 34: break;                           // Vector 34:  ADC12IFG14
+  default: break;
   }
 }
+
 
 
 
 /*
  * Set timer to raise an interrupt after ms milliseconds
  * NOTE: ms must < 512
+ * FIXME: why then the code checks for 195??
  */
 void timer_set(int ms)
 {
@@ -739,6 +809,46 @@ void timer_clear(void)
   TA1CCTL0 = 0;                             // CCR0 interrupt disabled
   TA1CTL = TACLR;
   uart_rx_timeout = 0;
+}
+
+
+
+/*
+ * Initiate a single ADC measure of the operating voltage
+ */
+void adc_start(unsigned char chan)
+{
+  ADC12CTL0  &= ~ADC12ENC;                     // Disable ADC
+
+  // Enable 2.0V shared reference, disable temperature sensor to save power
+  REFCTL0 |= REFMSTR + REFVSEL_1 + REFON + REFTCOFF;
+
+  ADC12MCTL0  = ADC12SREF_0;                   // V(R+) = AVCC and V(R-) = AVSS
+  ADC12MCTL0 |= chan;                          // Measure channel
+
+  ADC12CTL2  |= ADC12RES_2;                    // 12bit resolution
+
+  ADC12CTL0   = ADC12SHT0_6 + ADC12ON;         // 128 clks
+  ADC12CTL1   = ADC12SSEL1 + ADC12SHP;         // Select ACLK
+
+  ADC12IE     = ADC12IE0;                      // enable ADC interrupt
+
+  adc_state = ADC_MEASURING;
+
+  ADC12CTL0 |= ADC12ENC + ADC12SC;             // Enable and start conversion
+
+}
+
+
+
+/*
+ * Shutdown ADC to save power
+ */
+void adc_shutdown(void)
+{
+  ADC12CTL0 &= ~ADC12ENC;                     // Disable ADC
+  ADC12CTL1 |= ADC12TCOFF;                    // Disable temperature sersor to save power
+  // FIXME: turn off reference
 }
 
 /* Emacs indentatation information

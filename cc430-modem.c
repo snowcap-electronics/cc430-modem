@@ -139,7 +139,7 @@ int main(void)
       unsigned char len = 0;
 
       adc_state = ADC_IDLE;
-      adc_init(); // or shutdown?
+      adc_shutdown();
 
       UartRxBuffer[len++] = 'B';
       UartRxBuffer[len++] = ':';
@@ -823,7 +823,7 @@ void adc_start(unsigned char chan)
   // Enable 2.0V shared reference, disable temperature sensor to save power
   REFCTL0 |= REFMSTR + REFVSEL_1 + REFON + REFTCOFF;
 
-  ADC12MCTL0  = ADC12SREF_0;                   // V(R+) = AVCC and V(R-) = AVSS
+  ADC12MCTL0  = ADC12SREF_1;                   // V(R+) = VREF+ and V(R-) = AVSS
   ADC12MCTL0 |= chan;                          // Measure channel
 
   ADC12CTL2  |= ADC12RES_2;                    // 12bit resolution

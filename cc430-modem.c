@@ -1019,6 +1019,8 @@ uint16_t i2c_read(void)
   I2CPRxData = I2CRxBuffer;                 // Start of RX buffer
   I2CRXByteCtr = 2;                         // Load RX byte counter
 
+  i2c_state = I2C_ACTIVE;
+
   while (UCB0CTL1 & UCTXSTP);               // Ensure stop condition got sent
   UCB0CTL1 |= UCTXSTT;                      // I2C start condition
 

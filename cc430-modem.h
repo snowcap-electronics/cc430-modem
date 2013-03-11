@@ -13,6 +13,7 @@ enum adc_state_t {
 
 enum i2c_state_t {
   I2C_IDLE = 0,
+  I2C_ACTIVE,
   I2C_READ_DATA
 };
 

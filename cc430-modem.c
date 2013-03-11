@@ -936,16 +936,18 @@ void USCI_B0_ISR(void)
         UCB0CTL1 |= UCTXSTP;                // Generate I2C stop condition
     } else {
       *I2CPRxData = UCB0RXBUF;              // Move final RX data to PRxData
+      i2c_state = I2C_IDLE;
       __bic_SR_register_on_exit(LPM0_bits); // Exit active CPU
     }
     break;
   case 12:                                  // Vector 12: TXIFG
     if (I2CTXByteCtr) {                     // Check TX byte counter
-      UCB0TXBUF = *I2CPTxData++;               // Load TX buffer
+      UCB0TXBUF = *I2CPTxData++;            // Load TX buffer
       I2CTXByteCtr--;                       // Decrement TX byte counter
     } else {
       UCB0CTL1 |= UCTXSTP;                  // I2C stop condition
       UCB0IFG &= ~UCTXIFG;                  // Clear USCI_B0 TX int flag
+      i2c_state = I2C_IDLE;
       __bic_SR_register_on_exit(LPM0_bits); // Exit LPM0
     }
     break;
@@ -990,20 +992,20 @@ void i2c_send(unsigned char *buf, unsigned char bytes)
   I2CTXByteCtr = bytes;                     // Load TX byte counter
   I2CPTxData = buf;                         // TX array start address
 
-  while (1) {
-    __delay_cycles(50);                     // Delay required between transaction
+  // FIXME: move out side this function?
+  __delay_cycles(50);                       // Delay required between transaction
 
-    UCB0CTL1 |= UCTR + UCTXSTT;             // I2C TX, start condition
+  i2c_state = I2C_ACTIVE;
 
+  UCB0CTL1 |= UCTR + UCTXSTT;               // I2C TX, start condition
+
+  while (i2c_state == I2C_ACTIVE) {
     __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
                                             // Remain in LPM0 until all data
                                             // is TX'd
-    while (UCB0CTL1 & UCTXSTP);             // Ensure stop condition got sent
-
-    if (I2CTXByteCtr == 0) {
-      break;
-    }
   }
+
+  while (UCB0CTL1 & UCTXSTP);               // Ensure stop condition got sent
 
 }
 
@@ -1017,16 +1019,13 @@ uint16_t i2c_read(void)
   I2CPRxData = I2CRxBuffer;                 // Start of RX buffer
   I2CRXByteCtr = 2;                         // Load RX byte counter
 
-  while (1) {
-    while (UCB0CTL1 & UCTXSTP);             // Ensure stop condition got sent
-    UCB0CTL1 |= UCTXSTT;                    // I2C start condition
+  while (UCB0CTL1 & UCTXSTP);               // Ensure stop condition got sent
+  UCB0CTL1 |= UCTXSTT;                      // I2C start condition
 
+  while (i2c_state == I2C_ACTIVE) {
     __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
                                             // Remain in LPM0 until all data
                                             // is RX'd
-    if (I2CRXByteCtr == 0) {
-      break;
-    }
   }
 
   return ((I2CRxBuffer[0] << 8) | I2CRxBuffer[1]);

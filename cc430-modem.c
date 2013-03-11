@@ -85,7 +85,7 @@ enum i2c_state_t i2c_tx_state;
 
 unsigned char I2CTXByteCtr;
 unsigned char *I2CPTxData;                   // Pointer to TX data
-unsigned char *I2CPRxData;                   // Pointer to RX data
+volatile unsigned char *I2CPRxData;          // Pointer to RX data
 unsigned char I2CRXByteCtr;
 volatile unsigned char I2CRxBuffer[8];       // I2C RX buffer
 
@@ -181,23 +181,61 @@ int main(void)
       len += sc_itoa(adc_result, &UartRxBuffer[len], UART_BUF_LEN - len);
       UartRxBuffer[len++] = '\r';
       UartRxBuffer[len++] = '\n';
+      UartRxBuffer_i = len;
       data_to_send = len;
     }
 
     if (i2c_rx_state == I2C_READ_DATA) {
-      uint16_t temp;
+      int16_t temp;
       unsigned char len = 0;
+      uint16_t temp_int;
+      uint32_t temp_frac;
+      char sign = 1;
 
       i2c_rx_state = I2C_IDLE;
 
-      temp = i2c_read();
+      temp = (int16_t)i2c_read();
 
+      /* Grab the sign and convert to positive
+       * Negative integer math is... interesting so we take the risk of
+       * asymmetry and convert to positive. This might incur heavy error
+       * for some values, but is verified to work correctly with a fixed
+       * dataset in the range of 127.93...-55.00 (from datasheets).
+       */
+      if (temp < 0) {
+        sign = -1;
+        temp *= -1;
+      }
       UartRxBuffer[len++] = 'T';
       UartRxBuffer[len++] = ':';
       UartRxBuffer[len++] = ' ';
-      len += sc_itoa(temp, &UartRxBuffer[len], UART_BUF_LEN - len);
+
+      /* We always mark the sign to make parsing easier */
+      UartRxBuffer[len++] = (sign == 1) ? '+' : '-';
+
+      /* Integer part */
+      temp_int = temp >> 8;
+
+      len += sc_itoa(temp_int, UartRxBuffer + len, UART_BUF_LEN - len);
+
+      /* Decimal part is in the low 8 bits, but only top 4 bits are used.
+       * One step is roughly 0.06253 degrees Celsius, but no floats here!
+       * So we multiply by 6253 and divide by 1000 to catch the first two
+       * decimal places
+       */
+      temp_frac = (((((uint32_t)temp) & 0xf0) >> 4) * 6253) / 1000;
+      UartRxBuffer[len++] = '.';
+
+      /* Add leading zero, if needed */
+      if (temp_frac < 10) {
+        UartRxBuffer[len++] = '0';
+      }
+
+      len += sc_itoa(temp_frac, UartRxBuffer + len, UART_BUF_LEN - len);
       UartRxBuffer[len++] = '\r';
       UartRxBuffer[len++] = '\n';
+
+      UartRxBuffer_i = len;
       data_to_send = len;
     }
 
@@ -930,7 +968,7 @@ void USCI_B0_ISR(void)
   case  4: break;                           // Vector  4: NACKIFG
   case  6: break;                           // Vector  6: start condition
   case  8: break;                           // Vector  8: stop condition
-  case 10: break;                           // Vector 10: RXIFG
+  case 10:                                  // Vector 10: RXIFG
     I2CRXByteCtr--;                         // Decrement RX byte counter
     *I2CPRxData++ = UCB0RXBUF;              // Move RX data to address PRxData
     if (I2CRXByteCtr > 0) {

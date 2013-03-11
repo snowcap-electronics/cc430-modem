@@ -86,7 +86,7 @@ unsigned char I2CTXByteCtr;
 unsigned char *I2CPTxData;                   // Pointer to TX data
 unsigned char *I2CPRxData;                   // Pointer to RX data
 unsigned char I2CRXByteCtr;
-volatile unsigned char I2CRxBuffer[16];      // Allocate 128 byte of RAM
+volatile unsigned char I2CRxBuffer[8];       // I2C RX buffer
 
 
 int main(void)
@@ -987,11 +987,11 @@ void i2c_init(void)
  */
 void i2c_send(unsigned char *buf, unsigned char bytes)
 {
+  I2CTXByteCtr = bytes;                     // Load TX byte counter
+  I2CPTxData = buf;                         // TX array start address
+
   while (1) {
     __delay_cycles(50);                     // Delay required between transaction
-    I2CPTxData = buf;                       // TX array start address
-
-    I2CTXByteCtr = bytes;                   // Load TX byte counter
 
     UCB0CTL1 |= UCTR + UCTXSTT;             // I2C TX, start condition
 
@@ -999,6 +999,10 @@ void i2c_send(unsigned char *buf, unsigned char bytes)
                                             // Remain in LPM0 until all data
                                             // is TX'd
     while (UCB0CTL1 & UCTXSTP);             // Ensure stop condition got sent
+
+    if (I2CTXByteCtr == 0) {
+      break;
+    }
   }
 
 }
@@ -1010,15 +1014,19 @@ void i2c_send(unsigned char *buf, unsigned char bytes)
  */
 uint16_t i2c_read(void)
 {
+  I2CPRxData = I2CRxBuffer;                 // Start of RX buffer
+  I2CRXByteCtr = 2;                         // Load RX byte counter
+
   while (1) {
-    I2CPRxData = (unsigned char *)I2CRxBuffer; // Start of RX buffer
-    I2CRXByteCtr = 2;                       // Load RX byte counter
     while (UCB0CTL1 & UCTXSTP);             // Ensure stop condition got sent
     UCB0CTL1 |= UCTXSTT;                    // I2C start condition
 
     __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
                                             // Remain in LPM0 until all data
                                             // is RX'd
+    if (I2CRXByteCtr == 0) {
+      break;
+    }
   }
 
   return ((I2CRxBuffer[0] << 8) | I2CRxBuffer[1]);

@@ -80,7 +80,8 @@ unsigned char rf_receiving = 0;
 enum adc_state_t adc_state;
 uint16_t         adc_result;
 
-enum i2c_state_t i2c_state;
+enum i2c_state_t i2c_rx_state;
+enum i2c_state_t i2c_tx_state;
 
 unsigned char I2CTXByteCtr;
 unsigned char *I2CPTxData;                   // Pointer to TX data
@@ -102,7 +103,8 @@ int main(void)
   InitRadio();
   InitLeds();
   adc_shutdown();
-  i2c_init();
+  i2c_pinmux();
+  i2c_reset();
 
 #if SC_USE_SLEEP == 0
   // Enable interrupts
@@ -182,11 +184,11 @@ int main(void)
       data_to_send = len;
     }
 
-    if (i2c_state == I2C_READ_DATA) {
+    if (i2c_rx_state == I2C_READ_DATA) {
       uint16_t temp;
       unsigned char len = 0;
 
-      i2c_state = I2C_IDLE;
+      i2c_rx_state = I2C_IDLE;
 
       temp = i2c_read();
 
@@ -777,7 +779,7 @@ void TIMER1_A0_ISR(void)
   switch(count) {
   case 5:
     // It takes 300ms for tmp275 to read data. Read it 1Hz @ 500ms.
-    i2c_state = I2C_READ_DATA;
+    i2c_rx_state = I2C_READ_DATA;
 #if SC_USE_SLEEP == 1
     // Exit active
     __bic_SR_register_on_exit(LPM0_bits);
@@ -926,17 +928,17 @@ void USCI_B0_ISR(void)
   case  0: break;                           // Vector  0: No interrupts
   case  2: break;                           // Vector  2: ALIFG
   case  4: break;                           // Vector  4: NACKIFG
-  case  6: break;                           // Vector  6: STTIFG
-  case  8: break;                           // Vector  8: STPIFG
+  case  6: break;                           // Vector  6: start condition
+  case  8: break;                           // Vector  8: stop condition
   case 10: break;                           // Vector 10: RXIFG
     I2CRXByteCtr--;                         // Decrement RX byte counter
-    if (I2CRXByteCtr) {
-      *I2CPRxData++ = UCB0RXBUF;            // Move RX data to address PRxData
-      if (I2CRXByteCtr == 1)                // Only one byte left?
+    *I2CPRxData++ = UCB0RXBUF;              // Move RX data to address PRxData
+    if (I2CRXByteCtr > 0) {
+      if (I2CRXByteCtr == 1) {              // Only one byte left?
         UCB0CTL1 |= UCTXSTP;                // Generate I2C stop condition
+      }
     } else {
-      *I2CPRxData = UCB0RXBUF;              // Move final RX data to PRxData
-      i2c_state = I2C_IDLE;
+      i2c_rx_state = I2C_IDLE;
       __bic_SR_register_on_exit(LPM0_bits); // Exit active CPU
     }
     break;
@@ -947,7 +949,7 @@ void USCI_B0_ISR(void)
     } else {
       UCB0CTL1 |= UCTXSTP;                  // I2C stop condition
       UCB0IFG &= ~UCTXIFG;                  // Clear USCI_B0 TX int flag
-      i2c_state = I2C_IDLE;
+      i2c_tx_state = I2C_IDLE;
       __bic_SR_register_on_exit(LPM0_bits); // Exit LPM0
     }
     break;
@@ -958,11 +960,10 @@ void USCI_B0_ISR(void)
 
 
 /*
- * Init i2c
+ * Set I2C pinmux
  */
-void i2c_init(void)
+void i2c_pinmux(void)
 {
-  i2c_state = I2C_IDLE;
 
   PMAPPWD = 0x02D52;                        // Get write-access to port mapping regs
   P1MAP3 = PM_UCB0SDA;                      // Map UCB0SDA output to P1.3
@@ -970,7 +971,16 @@ void i2c_init(void)
   PMAPPWD = 0;                              // Lock port mapping registers
 
   P1SEL |= BIT2 + BIT3;                     // Select P1.2 & P1.3 to I2C function
+}
 
+
+/*
+ * Reset I2C.
+ */
+void i2c_reset(void)
+{
+  i2c_rx_state = I2C_IDLE;
+  i2c_tx_state = I2C_IDLE;
   UCB0CTL1 |= UCSWRST;                      // Enable SW reset
   UCB0CTL0 = UCMST + UCMODE_3 + UCSYNC;     // I2C Master, synchronous mode
   UCB0CTL1 = UCSSEL_2 + UCSWRST;            // Use SMCLK, keep SW reset
@@ -978,8 +988,7 @@ void i2c_init(void)
   UCB0BR1 = 0;
   UCB0I2CSA = 0x4F;                         // TMP275 Slave Address is 04Fh
   UCB0CTL1 &= ~UCSWRST;                     // Clear SW reset, resume operation
-  UCB0IE |= UCTXIE;                         // Enable TX interrupt
-
+  UCB0IE |= UCTXIE + UCRXIE;                // Enable interrupts
 }
 
 
@@ -995,11 +1004,12 @@ void i2c_send(unsigned char *buf, unsigned char bytes)
   // FIXME: move out side this function?
   __delay_cycles(50);                       // Delay required between transaction
 
-  i2c_state = I2C_ACTIVE;
+  i2c_tx_state = I2C_ACTIVE;
 
+  while (UCB0CTL1 & UCTXSTP);               // Ensure stop condition got sent
   UCB0CTL1 |= UCTR + UCTXSTT;               // I2C TX, start condition
 
-  while (i2c_state == I2C_ACTIVE) {
+  while (i2c_tx_state == I2C_ACTIVE) {
     __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
                                             // Remain in LPM0 until all data
                                             // is TX'd
@@ -1019,12 +1029,19 @@ uint16_t i2c_read(void)
   I2CPRxData = I2CRxBuffer;                 // Start of RX buffer
   I2CRXByteCtr = 2;                         // Load RX byte counter
 
-  i2c_state = I2C_ACTIVE;
+  i2c_rx_state = I2C_ACTIVE;
 
   while (UCB0CTL1 & UCTXSTP);               // Ensure stop condition got sent
+  UCB0CTL1 &= ~UCTR;                        // Make sure TX is not set
   UCB0CTL1 |= UCTXSTT;                      // I2C start condition
 
-  while (i2c_state == I2C_ACTIVE) {
+#if 0
+  // FIXME: if receiving only 1 byte, need to send stop immediately
+  while(UCB0CTL1 & UCTXSTT);                // Start condition sent?
+  UCB0CTL1 |= UCTXSTP;                      // I2C stop condition
+#endif
+
+  while (i2c_rx_state == I2C_ACTIVE) {
     __bis_status_register(LPM0_bits + GIE); // Enter LPM0, enable interrupts
                                             // Remain in LPM0 until all data
                                             // is RX'd

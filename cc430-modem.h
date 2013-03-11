@@ -41,6 +41,7 @@ void timer_clear(void);
 
 void adc_start(unsigned char chan);
 void adc_shutdown(void);
-void i2c_init(void);
+void i2c_pinmux(void);
+void i2c_reset(void);
 void i2c_send(unsigned char *buf, unsigned char bytes);
 uint16_t i2c_read(void);

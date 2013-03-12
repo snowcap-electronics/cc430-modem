@@ -16,8 +16,8 @@
 #define PACKET_LEN         (PAYLOAD_LEN + 3)   // PACKET_LEN = payload + len + RSSI + LQI
 #define UART_BUF_LEN       (PAYLOAD_LEN * 3)   // Bigger buffers for uart
 #define CRC_OK             (BIT7)              // CRC_OK bit
-//#define PATABLE_VAL        (0xC3)              // +10 dBm output
-#define PATABLE_VAL        (0x51)              // 0 dBm output
+#define PATABLE_VAL        (0xC3)              // +10 dBm output
+//#define PATABLE_VAL        (0x51)              // 0 dBm output
 
 #define USE_DEBUG_LEDS     2                   // No of debug leds
 #define SC_USE_SLEEP       1                   // Use sleep instead busyloop
@@ -98,11 +98,12 @@ int main(void)
   // Increase PMMCOREV level to 2 for proper radio operation
   SetVCore(2);
 
-  ResetRadioCore();
-  InitUart();
-  InitRadio();
-  InitLeds();
-  adc_shutdown();
+  //ResetRadioCore();
+
+  //InitUart();
+  //InitRadio();
+  //InitLeds();
+  //adc_shutdown();
   i2c_pinmux();
   i2c_reset();
 
@@ -125,12 +126,33 @@ int main(void)
        Resolution: 11 (12 bits)
        One-shot: 0
     */
-    tx_data[1] = 0b01100000;
+    tx_data[1] = 0b01100001;
     i2c_send(tx_data, 2);
 
     /* Set pointer to temperature register here so we can read without writing */
     tx_data[0] = 0x0;
     i2c_send(tx_data, 1);
+  }
+
+  UCB0CTL1 |= UCSWRST;                      // Enable SW reset
+  P1SEL = 0;
+
+  while (1) {
+
+    //led_on(1);
+
+    timer_set(10000);
+
+    __bis_status_register(LPM3_bits + GIE);
+
+    //led_off(1);
+    //led_on(2);
+
+    timer_set(5000);
+
+    __bis_status_register(LPM0_bits + GIE);
+    //led_off(2);
+
   }
 
   // Start timer. After 10 interrupts, ADC is started
@@ -810,7 +832,13 @@ void sleep_ms(int ms)
 __attribute__((interrupt(TIMER1_A0_VECTOR)))
 void TIMER1_A0_ISR(void)
 {
+#if 1
+  timer_clear();
+  // Exit active
+  __bic_SR_register_on_exit(LPM3_bits);
+#else
   static char count = 0;
+
   timer_clear();
 
   ++count;
@@ -836,6 +864,7 @@ void TIMER1_A0_ISR(void)
 
   // Always set new timer
   timer_set(100);
+#endif
 }
 
 
@@ -893,12 +922,12 @@ void ADC12_ISR(void)
  */
 void timer_set(int ms)
 {
-  if (ms > 195) {
-    ms = 195;
+  if (ms > 20000) {
+    ms = 20000;
   }
 
-  TA1CCR0  = ms << 7;                       // ms milliseconds
-  TA1CTL = TASSEL_2 + MC_1 + ID_3;          // SMCLK/8, upmode
+  TA1CCR0  = ms << 2;                       // ms milliseconds
+  TA1CTL = TASSEL_1 + MC_1 + ID_3;          // SMCLK/8, upmode
   TA1CCTL0 = CCIE;                          // CCR0 interrupt enabled
 }
 

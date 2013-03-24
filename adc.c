@@ -40,7 +40,6 @@ __attribute__((interrupt(ADC12_VECTOR)))
 void ADC12_ISR(void)
 {
 
-  led_toggle(2);
   switch(ADC12IV) {
   case  0: break;                           // Vector  0:  No interrupt
   case  2: break;                           // Vector  2:  ADC overflow

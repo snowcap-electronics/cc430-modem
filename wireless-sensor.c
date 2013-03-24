@@ -72,16 +72,15 @@ int main(void)
     unsigned char RxStatus;
 
     led_on(1);
-    led_toggle(2);
 
-    //i2c_init();
+    i2c_init();
 
-    //tmp275_start_oneshot();
+    tmp275_start_oneshot();
 
     timer_sleep_ms(220, LPM1_bits);
-    led_toggle(2);
+    led_off(2);
 
-    //adc_start(ADC_CHANNEL_BATTERY);
+    adc_start(ADC_CHANNEL_BATTERY);
 
     rf_init();
 
@@ -89,12 +88,11 @@ int main(void)
     while (((RxStatus = Strobe(RF_SNOP)) & CC430_STATE_MASK) != CC430_STATE_IDLE) {
       timer_sleep_ms(1, LPM1_bits);
     }
-    led_toggle(2);
 
     rf_receiving = 1;
     rf_receive_on();
 
-    if (0) {
+    if (1) {
       uint8_t adc_timeout = 0;
 
       // Wait until ADC ready, with timeout
@@ -109,13 +107,12 @@ int main(void)
         adcbatt = adc_result;
       }
     }
-    led_toggle(2);
 
     // Read temperature from TMP275
     // FIXME: implement tmp275_read_temp() instead
-    //temp = i2c_read();
+    temp = i2c_read();
 
-    //i2c_shutdown();
+    i2c_shutdown();
 
     {
       // Send message and wait for completion of the tx, with timeout
@@ -129,14 +126,15 @@ int main(void)
         timer_sleep_ms(1, LPM1_bits);
       }
     }
-    led_toggle(2);
+    led_on(2);
+    timer_sleep_ms(2*1000, LPM1_bits);
 
     rf_shutdown();
 
     led_off(1);
     led_off(2);
 
-    timer_sleep_ms(2*1000, LPM3_bits);
+    timer_sleep_ms(4*1000, LPM3_bits);
 
     //timer_sleep_min(10, LPM3_bits);
   }

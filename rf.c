@@ -160,7 +160,6 @@ void CC1101_ISR(void)
 
     // RF TX end of packet
     if(rf_transmitting) {
-      led_off(1);
       rf_transmitting = 0;
     }
     break;

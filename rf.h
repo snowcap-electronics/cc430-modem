@@ -68,12 +68,16 @@ extern unsigned char rf_error;
 extern unsigned char rf_transmitting;
 extern unsigned char rf_receiving;
 
+enum RF_SEND_MSG {
+  RF_SEND_MSG_FULL,
+  RF_SEND_MSG_FORCE
+};
 
 void rf_init(void);
 void rf_shutdown(void);
 void rf_receive_on(void);
 void rf_receive_off(void);
 void rf_append_msg(unsigned char *buf, unsigned char len);
-void rf_send_next_msg(uint8_t force);
+uint8_t rf_send_next_msg(enum RF_SEND_MSG force);
 
 #endif

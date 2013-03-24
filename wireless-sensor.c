@@ -27,7 +27,21 @@
  *
  */
 
-#include "wireless-sensor.h"
+#include "common.h"
+#include "adc.h"
+#include "i2c.h"
+#include "led.h"
+#include "rf.h"
+#include "timer.h"
+#include "tmp275.h"
+#include "uart.h"
+#include "utils.h"
+
+#include "msp430.h"
+#include "RF1A.h"
+#include "hal_pmm.h"
+
+#include <stdint.h>
 
 static void send_message(uint16_t batt, uint16_t temp);
 
@@ -89,7 +103,6 @@ int main(void)
       timer_sleep_ms(1, LPM1_bits);
     }
 
-    rf_receiving = 1;
     rf_receive_on();
 
     if (1) {
@@ -208,7 +221,7 @@ static void send_message(uint16_t adcbatt, uint16_t rawtemp)
 
   // Send the message
   rf_append_msg(buf, len);
-  rf_send_next_msg(0);
+  rf_send_next_msg(RF_SEND_MSG_FULL);
 }
 
 

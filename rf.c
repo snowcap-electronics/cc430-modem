@@ -96,6 +96,8 @@ void rf_shutdown(void)
  */
 void rf_receive_on(void)
 {
+  rf_receiving = 1;
+
   // Falling edge of RFIFG9
   RF1AIES |= BIT9;
 
@@ -116,6 +118,7 @@ void rf_receive_on(void)
  */
 void rf_receive_off(void)
 {
+
   // Disable RX interrupts
   RF1AIE &= ~BIT9;
 
@@ -127,6 +130,8 @@ void rf_receive_off(void)
   // such that the RXFIFO is empty prior to receiving a packet.
   Strobe(RF_SIDLE);
   Strobe(RF_SFRX);
+
+  rf_receiving = 0;
 }
 
 
@@ -211,14 +216,14 @@ void rf_append_msg(unsigned char *buf, unsigned char len)
 /*
  * Send next message from the queue
  */
-void rf_send_next_msg(uint8_t force)
+uint8_t rf_send_next_msg(enum RF_SEND_MSG force)
 {
   unsigned char x;
   int len = -1;
 
   // Do nothing, if already transmitting
   if (rf_transmitting) {
-    return;
+    return 0;
   }
 
   // Disable interrupts to make sure RfTxQueue isn't modified in the middle
@@ -264,17 +269,17 @@ void rf_send_next_msg(uint8_t force)
   // Stop receive mode
   if (rf_receiving) {
     rf_receive_off();
-    rf_receiving = 0;
   }
 
   // Send buffer over RF (len +1 for length byte)
   rf_transmitting = 1;
-  transmit_msg((unsigned char*)RfTxBuffer, RfTxBuffer[0] + 1);
+  len = RfTxBuffer[0];
+  transmit_msg((unsigned char*)RfTxBuffer, len + 1);
 
   // Enable interrupts
   __bis_status_register(GIE);
 
-  return;
+  return len;
 }
 
 

@@ -30,6 +30,7 @@
 #include "utils.h"
 
 static uint16_t timer_repeats = 0;
+extern uint8_t timer_occurred = 0;
 
 /*
  * Timeout, repeat timer_repeats times, then wake up from sleep
@@ -49,6 +50,7 @@ void TIMER1_A0_ISR(void)
   // Clearing all LPM4 bits should be fine even if we are only in LPM0
   __bic_status_register_on_exit(LPM4_bits);
 #endif
+  timer_occurred = 1;
 }
 
 
@@ -65,6 +67,7 @@ void timer_set(int ms)
     ms = 16000;
   }
 
+  timer_occurred = 0;
   TA1CCR0  = ms << 2;                       // ms milliseconds
   TA1CTL = TASSEL_1 + MC_1 + ID_3;          // ACLK/8, upmode
   TA1CCTL0 = CCIE;                          // CCR0 interrupt enabled
@@ -78,6 +81,7 @@ void timer_set(int ms)
 void timer_clear(void)
 {
   // Clear timer register, disable timer interrupts
+  timer_occurred = 0;
   timer_repeats = 0;
   TA1CCTL0 = 0;                             // CCR0 interrupt disabled
   TA1CTL = TACLR;

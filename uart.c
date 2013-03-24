@@ -38,6 +38,7 @@ unsigned char UartTxBuffer_i = 0;
 unsigned char UartTxBufferLength = 0;
 unsigned char uart_rx_timeout = 0;
 
+static void handle_uart_rx_byte(void);
 
 /*
  * Map P1.5 & P1.6 to Uart TX and RX and initialise Uart as 115200 8N1
@@ -75,12 +76,11 @@ void USCI_A0_ISR(void)
   switch(UCA0IV) {
   case 0: break;                            // Vector 0 - no interrupt
   case 2:                                   // Vector 2 - RXIFG
-    if (handle_uart_rx_byte()) {
+    handle_uart_rx_byte();
 #if SC_USE_SLEEP == 1
-      // Exit active
-      __bic_status_register_on_exit(LPM3_bits);
+    // Exit active
+    __bic_status_register_on_exit(LPM3_bits);
 #endif
-    }
     break;
   case 4:                                   // Vector 4 - TXIFG
     if (UartTxBufferLength == 0) {          // Spurious interrupt (or a workaround for a bug)?
@@ -107,7 +107,7 @@ void USCI_A0_ISR(void)
 /*
  * Called from interrupt handler to handle the received byte over uart
  */
-int handle_uart_rx_byte(void)
+static void handle_uart_rx_byte(void)
 {
   unsigned char tmpchar;
 
@@ -115,13 +115,13 @@ int handle_uart_rx_byte(void)
 
   // Discard the byte if buffer already full
   if (UartRxBuffer_i == UART_BUF_LEN) {
-    return 0;
+    return;
   }
 
   // Store received byte
   UartRxBuffer[UartRxBuffer_i++] = tmpchar;
 
-  return 0;
+  return;
 }
 
 

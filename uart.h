@@ -51,6 +51,5 @@ extern unsigned char uart_rx_timeout;
 
 
 void uart_init(void);
-int handle_uart_rx_byte(void);
 
 #endif

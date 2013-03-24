@@ -1,4 +1,5 @@
-PROJECT1 = wireless-sensor
+PROJECT1 = wireless-uart
+PROJECT2 = wireless-sensor
 
 CROSS_COMPILE = msp430-
 CC      = $(CROSS_COMPILE)gcc
@@ -25,7 +26,6 @@ SRC =   adc.c \
 		utils.c \
 		utils.h \
 		common.h \
-		wireless-sensor.h \
 		./HAL/RfRegSettings.c \
         ./HAL/RF1A.c \
         ./HAL/hal_pmm.c \
@@ -49,15 +49,18 @@ CFLAGS  = -Wall -g -O0 -mmcu=cc430f5137 -I./HAL
 
 FEATURES += -DMHZ_433
 
-all: $(SRC) $(PROJECT1).c $(PROJECT1).elf
+all: $(SRC) $(PROJECT1).c $(PROJECT1).elf $(PROJECT2).c $(PROJECT2).elf
 
 $(PROJECT1).elf: $(OBJ) $(PROJECT1).o $(PROJECT1).c
 	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT1).o -o $@
+
+$(PROJECT2).elf: $(OBJ) $(PROJECT2).o $(PROJECT2).c
+	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT2).o -o $@
 
 $(COBJ): %.o: %.c
 	$(CC) -c $(FEATURES) $(INC) $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(PROJECT1).elf $(PROJECT1).o $(OBJ)
+	rm -f $(PROJECT1).elf $(PROJECT1).o $(PROJECT2).elf $(PROJECT2).o $(OBJ)
 
 .PHONY: clean

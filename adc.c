@@ -110,10 +110,12 @@ void adc_start(unsigned char chan)
  */
 void adc_shutdown(void)
 {
-  ADC12CTL0 &= ~ADC12ENC;                     // Disable ADC
-  ADC12CTL1 |= ADC12TCOFF;                    // Disable temperature sersor to save power
-  // FIXME: turn off reference, maybe like this:
-  // REFCTL0 &= ~ REFON;
+  ADC12CTL0  = 0;                             // Disable ADC
+  ADC12CTL1  = 0;                             // Disable ADC
+  ADC12CTL2 |= ADC12TCOFF;                    // Disable temperature sersor to save power
+  //REFCTL0   &= ~(REFMSTR & REFON);            // Turn off reference and master control
+  // FIXME: why this works while the above doesn't?
+  REFCTL0 = 0;
 }
 
 

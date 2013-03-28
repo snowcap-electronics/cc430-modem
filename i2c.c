@@ -104,6 +104,7 @@ void i2c_init(void)
   UCB0CTL1 = UCSSEL_2 + UCSWRST;            // Use SMCLK, keep SW reset
   UCB0BR0 = 12;                             // fSCL = SMCLK/12 = ~100kHz
   UCB0BR1 = 0;
+  // FIXME: shouldn't set slave address here? At least a parameter
   UCB0I2CSA = 0x4F;                         // TMP275 Slave Address is 04Fh
   UCB0CTL1 &= ~UCSWRST;                     // Clear SW reset, resume operation
   UCB0IE |= UCTXIE + UCRXIE;                // Enable interrupts
@@ -176,7 +177,7 @@ uint16_t i2c_read(void)
 void i2c_shutdown(void)
 {
   UCB0CTL1 |= UCSWRST;                      // Enable SW reset
-  P1SEL = 0;                                // Un-mux the pin
+  P1SEL &= ~(BIT2 + BIT3);                  // Unselect P1.2 & P1.3 to I2C function
 }
 
 

@@ -56,6 +56,32 @@ void tmp275_start_oneshot(void)
     i2c_send(tx_data, 1);
 }
 
+void tmp275_shutdown(void)
+{
+    unsigned char tx_data[2];
+
+    /* Pointer to Configuration register */
+    tx_data[0] = 0x1;
+
+    /* Configuration:
+       Shutdown mode: 0
+       Thermostat mode: 0
+       Polarity: 0
+       Fault queue: 00
+       Resolution: 11 (12 bits)
+       One-shot: 1
+    */
+    tx_data[1] = 0b01100001;
+    i2c_send(tx_data, 2);
+
+    // FIXME: move out side this function?
+    __delay_cycles(50);                    // Delay required between transaction
+
+    /* Set pointer to temperature register here so we can read without writing */
+    tx_data[0] = 0x0;
+    i2c_send(tx_data, 1);
+}
+
 
 
 /* Emacs indentatation information

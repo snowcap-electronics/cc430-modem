@@ -32,5 +32,6 @@
 #include "common.h"
 
 void tmp275_start_oneshot(void);
+void tmp275_shutdown(void);
 
 #endif

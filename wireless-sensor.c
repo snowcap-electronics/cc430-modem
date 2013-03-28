@@ -50,6 +50,13 @@ int main(void)
   // Stop watchdog timer to prevent time out reset
   WDTCTL = WDTPW + WDTHOLD;
 
+  // Select VLOCLK for aux clock source
+  UCSCTL4 |= SELA__VLOCLK;
+
+  // Turn off SMCLK (it turns on automatically, if a module uses it)
+  // FIXME: Nothing is received, if SMCLK is turned off
+  //UCSCTL6 |= SMCLKOFF;
+
   // Increase PMMCOREV level to 2 for proper radio operation
   SetVCore(2);
 

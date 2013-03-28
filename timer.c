@@ -68,7 +68,7 @@ void timer_set(int ms)
   }
 
   timer_occurred = 0;
-  TA1CCR0  = ms << 2;                       // ms milliseconds
+  TA1CCR0  = ms << 0;                       // ms milliseconds
   TA1CTL = TASSEL_1 + MC_1 + ID_3;          // ACLK/8, upmode
   TA1CCTL0 = CCIE;                          // CCR0 interrupt enabled
 }

@@ -29,26 +29,4 @@
   */
 unsigned int SetVCore (unsigned char level);
 
-//====================================================================
-/**
-  * Set the VCore to a higher level, if it is possible.
-  * Return a 1 if voltage at highside (Vcc) is to low
-  * for the selected Level (level).
-  *
-  * \param      level       PMM level ID
-  * \return	int	    1: error / 0: done
-  */
-unsigned int SetVCoreUp (unsigned char level);
-
-//====================================================================
-/**
-  * Set the VCore to a lower level.
-  * Return a 1 if voltage at highside (Vcc) is still to low
-  * for the selected Level (level).
-  *
-  * \param      level       PMM level ID
-  * \return	int	    1: done with error / 0: done without error
-  */
-unsigned int SetVCoreDown (unsigned char level);
-
 #endif /* __PMM */

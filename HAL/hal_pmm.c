@@ -1,70 +1,45 @@
-//****************************************************************************//
-// Function Library for setting the PMM
-//    File: hal_pmm.c
-//
-//    Texas Instruments
-//
-//    Version 1.2
-//    11/24/09
-//
-//    V1.0  Initial Version
-//    V1.1  Adjustment to UG
-//    V1.2  Added return values
-//****************************************************************************////====================================================================
-
-
-/* ***********************************************************
-* THIS PROGRAM IS PROVIDED "AS IS". TI MAKES NO WARRANTIES OR
-* REPRESENTATIONS, EITHER EXPRESS, IMPLIED OR STATUTORY,
-* INCLUDING ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS
-* FOR A PARTICULAR PURPOSE, LACK OF VIRUSES, ACCURACY OR
-* COMPLETENESS OF RESPONSES, RESULTS AND LACK OF NEGLIGENCE.
-* TI DISCLAIMS ANY WARRANTY OF TITLE, QUIET ENJOYMENT, QUIET
-* POSSESSION, AND NON-INFRINGEMENT OF ANY THIRD PARTY
-* INTELLECTUAL PROPERTY RIGHTS WITH REGARD TO THE PROGRAM OR
-* YOUR USE OF THE PROGRAM.
-*
-* IN NO EVENT SHALL TI BE LIABLE FOR ANY SPECIAL, INCIDENTAL,
-* CONSEQUENTIAL OR INDIRECT DAMAGES, HOWEVER CAUSED, ON ANY
-* THEORY OF LIABILITY AND WHETHER OR NOT TI HAS BEEN ADVISED
-* OF THE POSSIBILITY OF SUCH DAMAGES, ARISING IN ANY WAY OUT
-* OF THIS AGREEMENT, THE PROGRAM, OR YOUR USE OF THE PROGRAM.
-* EXCLUDED DAMAGES INCLUDE, BUT ARE NOT LIMITED TO, COST OF
-* REMOVAL OR REINSTALLATION, COMPUTER TIME, LABOR COSTS, LOSS
-* OF GOODWILL, LOSS OF PROFITS, LOSS OF SAVINGS, OR LOSS OF
-* USE OR INTERRUPTION OF BUSINESS. IN NO EVENT WILL TI'S
-* AGGREGATE LIABILITY UNDER THIS AGREEMENT OR ARISING OUT OF
-* YOUR USE OF THE PROGRAM EXCEED FIVE HUNDRED DOLLARS
-* (U.S.$500).
-*
-* Unless otherwise stated, the Program written and copyrighted
-* by Texas Instruments is distributed as "freeware".  You may,
-* only under TI's copyright in the Program, use and modify the
-* Program without any charge or restriction.  You may
-* distribute to third parties, provided that you transfer a
-* copy of this license to the third party and the third party
-* agrees to these terms by its first use of the Program. You
-* must reproduce the copyright notice and any other legend of
-* ownership on each copy or partial copy, of the Program.
-*
-* You acknowledge and agree that the Program contains
-* copyrighted material, trade secrets and other TI proprietary
-* information and is protected by copyright laws,
-* international copyright treaties, and trade secret laws, as
-* well as other intellectual property laws.  To protect TI's
-* rights in the Program, you agree not to decompile, reverse
-* engineer, disassemble or otherwise translate any object code
-* versions of the Program to a human-readable form.  You agree
-* that in no event will you alter, remove or destroy any
-* copyright notice included in the Program.  TI reserves all
-* rights not specifically granted under this license. Except
-* as specifically provided herein, nothing in this agreement
-* shall be construed as conferring by implication, estoppel,
-* or otherwise, upon you, any license or other right under any
-* TI patents, copyrights or trade secrets.
-*
-* You may not use the Program in non-TI devices.
-* ********************************************************* */
+/*******************************************************************************
+ *
+ * HAL_PMM.c
+ * Power Management Module Library for MSP430F5xx/6xx family
+ * 
+ *
+ * Copyright (C) 2010 Texas Instruments Incorporated - http://www.ti.com/
+ * 
+ * 
+ *  Redistribution and use in source and binary forms, with or without 
+ *  modification, are permitted provided that the following conditions 
+ *  are met:
+ *
+ *    Redistributions of source code must retain the above copyright 
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ *    Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the 
+ *    documentation and/or other materials provided with the   
+ *    distribution.
+ *
+ *    Neither the name of Texas Instruments Incorporated nor the names of
+ *    its contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT 
+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT 
+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE 
+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * Created: Version 1.0 11/24/2009
+ * Updated: Version 2.0 12/15/2010
+ *          Modified SetVcoreUp() and SetVcoreDown() functions
+ *  
+ ******************************************************************************/
 
 #include "cc430f5137.h"
 #include "hal_pmm.h"
@@ -73,158 +48,227 @@
 #define _HAL_PMM_DISABLE_SVSL_
 #define _HAL_PMM_DISABLE_FULL_PERFORMANCE_
 
-
-//****************************************************************************//
 #ifdef _HAL_PMM_DISABLE_SVML_
-#define _HAL_PMM_SVMLE SVMLE
+#define _HAL_PMM_SVMLE  SVMLE
 #else
-#define _HAL_PMM_SVMLE 0
+#define _HAL_PMM_SVMLE  0
 #endif
+
 #ifdef _HAL_PMM_DISABLE_SVSL_
-#define _HAL_PMM_SVSLE SVSLE
+#define _HAL_PMM_SVSLE  SVSLE
 #else
-#define _HAL_PMM_SVSLE 0
+#define _HAL_PMM_SVSLE  0
 #endif
+
 #ifdef _HAL_PMM_DISABLE_FULL_PERFORMANCE_
-#define _HAL_PMM_SVSFP SVSLFP
+#define _HAL_PMM_SVSFP  SVSLFP
+#define _HAL_PMM_SVMFP  SVMLFP
 #else
-#define _HAL_PMM_SVSFP 0
+#define _HAL_PMM_SVSFP  0
+#define _HAL_PMM_SVMFP  0
 #endif
-//****************************************************************************//
-// Set VCore
-//****************************************************************************//
-unsigned int SetVCore (unsigned char level)
+
+/*******************************************************************************
+ * \brief   Increase Vcore by one level
+ *
+ * \param level     Level to which Vcore needs to be increased
+ * \return status   Success/failure
+ ******************************************************************************/
+static unsigned int SetVCoreUp(unsigned char level)
 {
-  unsigned int actlevel;
-  unsigned int status = 0;
-  level &= PMMCOREV_3;                       // Set Mask for Max. level
-  actlevel = (PMMCTL0 & PMMCOREV_3);         // Get actual VCore
+  unsigned int PMMRIE_backup, SVSMHCTL_backup, SVSMLCTL_backup;
+   
+  // The code flow for increasing the Vcore has been altered to work around
+  // the erratum FLASH37. 
+  // Please refer to the Errata sheet to know if a specific device is affected
+  // DO NOT ALTER THIS FUNCTION
 
-  while (((level != actlevel) && (status == 0)) || (level < actlevel))		// step by step increase or decrease
-  {
-    if (level > actlevel)
-      status = SetVCoreUp(++actlevel);
-    else
-      status = SetVCoreDown(--actlevel);
-  }
-  return status;
-}
-
-//****************************************************************************//
-// Set VCore Up
-//****************************************************************************//
-unsigned int SetVCoreUp (unsigned char level)
-{
-  unsigned int PMMRIE_backup,SVSMHCTL_backup;
-
-  // Open PMM registers for write access
+  // Open PMM registers for write access   
   PMMCTL0_H = 0xA5;
-
-  // Disable dedicated Interrupts to prevent that needed flags will be cleared
+  
+  // Disable dedicated Interrupts
+  // Backup all registers
   PMMRIE_backup = PMMRIE;
-  PMMRIE &= ~(SVSMHDLYIE | SVSMLDLYIE | SVMLVLRIE | SVMHVLRIE | SVMHVLRPE);
-  // Set SVM highside to new level and check if a VCore increase is possible
+  PMMRIE &= ~(SVMHVLRPE | SVSHPE | SVMLVLRPE | SVSLPE | SVMHVLRIE |
+        SVMHIE | SVSMHDLYIE | SVMLVLRIE | SVMLIE | SVSMLDLYIE );
   SVSMHCTL_backup = SVSMHCTL;
-  PMMIFG &= ~(SVMHIFG | SVSMHDLYIFG);
-  SVSMHCTL = SVMHE | SVMHFP | (SVSMHRRL0 * level);
+  SVSMLCTL_backup = SVSMLCTL;
+
+  // Clear flags
+  PMMIFG = 0;
+
+  // Set SVM highside to new level and check if a VCore increase is possible
+  SVSMHCTL = SVMHE | SVSHE | (SVSMHRRL0 * level);    
+
   // Wait until SVM highside is settled
-  while ((PMMIFG & SVSMHDLYIFG) == 0);
-  // Disable full-performance mode to save energy
-  SVSMHCTL &= ~_HAL_PMM_SVSFP ;
+  while ((PMMIFG & SVSMHDLYIFG) == 0); 
+
+  // Clear flag
+  PMMIFG &= ~SVSMHDLYIFG;
+  
   // Check if a VCore increase is possible
-  if ((PMMIFG & SVMHIFG) == SVMHIFG){			//-> Vcc is to low for a Vcore increase
+  if ((PMMIFG & SVMHIFG) == SVMHIFG) {      // -> Vcc is too low for a Vcore increase
   	// recover the previous settings
   	PMMIFG &= ~SVSMHDLYIFG;
   	SVSMHCTL = SVSMHCTL_backup;
+
   	// Wait until SVM highside is settled
   	while ((PMMIFG & SVSMHDLYIFG) == 0);
+
   	// Clear all Flags
   	PMMIFG &= ~(SVMHVLRIFG | SVMHIFG | SVSMHDLYIFG | SVMLVLRIFG | SVMLIFG | SVSMLDLYIFG);
-  	// backup PMM-Interrupt-Register
-  	PMMRIE = PMMRIE_backup;
-  	
-  	// Lock PMM registers for write access
-  	PMMCTL0_H = 0x00;
-  	return PMM_STATUS_ERROR;                       // return: voltage not set
+
+  	PMMRIE = PMMRIE_backup;                 // Restore PMM interrupt enable register
+  	PMMCTL0_H = 0x00;                       // Lock PMM registers for write access
+  	return PMM_STATUS_ERROR;                // return: voltage not set
   }
-  // Set also SVS highside to new level			//-> Vcc is high enough for a Vcore increase
-  SVSMHCTL |= SVSHE | (SVSHRVL0 * level);
-  // Set SVM low side to new level
-  SVSMLCTL = SVMLE | SVMLFP | (SVSMLRRL0 * level);
-  // Wait until SVM low side is settled
-  while ((PMMIFG & SVSMLDLYIFG) == 0);
-  // Clear already set flags
-  PMMIFG &= ~(SVMLVLRIFG | SVMLIFG);
+  
+  // Set also SVS highside to new level	    
+  // Vcc is high enough for a Vcore increase
+  SVSMHCTL |= (SVSHRVL0 * level);
+
+  // Wait until SVM highside is settled
+  while ((PMMIFG & SVSMHDLYIFG) == 0);    
+
+  // Clear flag
+  PMMIFG &= ~SVSMHDLYIFG;
+  
   // Set VCore to new level
   PMMCTL0_L = PMMCOREV0 * level;
-  // Wait until new level reached
-  if (PMMIFG & SVMLIFG)
-  while ((PMMIFG & SVMLVLRIFG) == 0);
-  // Set also SVS/SVM low side to new level
-  PMMIFG &= ~SVSMLDLYIFG;
-  SVSMLCTL |= SVSLE | (SVSLRVL0 * level);
-  // wait for lowside delay flags
+
+  // Set SVM, SVS low side to new level
+  SVSMLCTL = SVMLE | (SVSMLRRL0 * level) | SVSLE | (SVSLRVL0 * level);
+
+  // Wait until SVM, SVS low side is settled
   while ((PMMIFG & SVSMLDLYIFG) == 0);
 
-// Disable SVS/SVM Low
-// Disable full-performance mode to save energy
-  SVSMLCTL &= ~(_HAL_PMM_DISABLE_SVSL_+_HAL_PMM_DISABLE_SVML_+_HAL_PMM_SVSFP );
+  // Clear flag
+  PMMIFG &= ~SVSMLDLYIFG;
+  // SVS, SVM core and high side are now set to protect for the new core level
+  
+  // Restore Low side settings
+  // Clear all other bits _except_ level settings
+  SVSMLCTL &= (SVSLRVL0+SVSLRVL1+SVSMLRRL0+SVSMLRRL1+SVSMLRRL2);
+
+  // Clear level settings in the backup register,keep all other bits
+  SVSMLCTL_backup &= ~(SVSLRVL0+SVSLRVL1+SVSMLRRL0+SVSMLRRL1+SVSMLRRL2);
+  
+  // Restore low-side SVS monitor settings
+  SVSMLCTL |= SVSMLCTL_backup;
+  
+  // Restore High side settings
+  // Clear all other bits except level settings
+  SVSMHCTL &= (SVSHRVL0+SVSHRVL1+SVSMHRRL0+SVSMHRRL1+SVSMHRRL2);
+
+  // Clear level settings in the backup register,keep all other bits
+  SVSMHCTL_backup &= ~(SVSHRVL0+SVSHRVL1+SVSMHRRL0+SVSMHRRL1+SVSMHRRL2);
+
+  // Restore backup 
+  SVSMHCTL |= SVSMHCTL_backup;
+  
+  // Wait until high side, low side settled
+  while (((PMMIFG & SVSMLDLYIFG) == 0) && ((PMMIFG & SVSMHDLYIFG) == 0));
 
   // Clear all Flags
   PMMIFG &= ~(SVMHVLRIFG | SVMHIFG | SVSMHDLYIFG | SVMLVLRIFG | SVMLIFG | SVSMLDLYIFG);
-  // backup PMM-Interrupt-Register
-  PMMRIE = PMMRIE_backup;
 
-  // Lock PMM registers for write access
-  PMMCTL0_H = 0x00;
-  return PMM_STATUS_OK;                               // return: OK
+  PMMRIE = PMMRIE_backup;                   // Restore PMM interrupt enable register
+  PMMCTL0_H = 0x00;                         // Lock PMM registers for write access
+
+  return PMM_STATUS_OK;  
 }
 
-//****************************************************************************//
-// Set VCore down (Independent from the enabled Interrupts in PMMRIE)
-//****************************************************************************//
-unsigned int SetVCoreDown (unsigned char level)
+/*******************************************************************************
+ * \brief  Decrease Vcore by one level
+ *
+ * \param  level    Level to which Vcore needs to be decreased
+ * \return status   Success/failure
+ ******************************************************************************/
+static unsigned int SetVCoreDown(unsigned char level)
 {
-  unsigned int PMMRIE_backup;
-
+  unsigned int PMMRIE_backup, SVSMHCTL_backup, SVSMLCTL_backup;
+  
+  // The code flow for decreasing the Vcore has been altered to work around
+  // the erratum FLASH37. 
+  // Please refer to the Errata sheet to know if a specific device is affected
+  // DO NOT ALTER THIS FUNCTION
+  
   // Open PMM registers for write access
   PMMCTL0_H = 0xA5;
 
-  // Disable dedicated Interrupts to prevent that needed flags will be cleared
+  // Disable dedicated Interrupts 
+  // Backup all registers
   PMMRIE_backup = PMMRIE;
-  PMMRIE &= ~(SVSMHDLYIE | SVSMLDLYIE | SVMLVLRIE | SVMHVLRIE | SVMHVLRPE);
+  PMMRIE &= ~(SVMHVLRPE | SVSHPE | SVMLVLRPE | SVSLPE | SVMHVLRIE |
+        SVMHIE | SVSMHDLYIE | SVMLVLRIE | SVMLIE | SVSMLDLYIE );
+  SVSMHCTL_backup = SVSMHCTL;
+  SVSMLCTL_backup = SVSMLCTL;
 
-  // Set SVM high side and SVM low side to new level
+  // Clear flags
   PMMIFG &= ~(SVMHIFG | SVSMHDLYIFG | SVMLIFG | SVSMLDLYIFG);
-  SVSMHCTL = SVMHE | SVMHFP | (SVSMHRRL0 * level);
-  SVSMLCTL = SVMLE | SVMLFP | (SVSMLRRL0 * level);
+  
+  // Set SVM, SVS high & low side to new settings in normal mode
+  SVSMHCTL = SVMHE | (SVSMHRRL0 * level) | SVSHE | (SVSHRVL0 * level);
+  SVSMLCTL = SVMLE | (SVSMLRRL0 * level) | SVSLE | (SVSLRVL0 * level);
+  
   // Wait until SVM high side and SVM low side is settled
   while ((PMMIFG & SVSMHDLYIFG) == 0 || (PMMIFG & SVSMLDLYIFG) == 0);
-
+  
+  // Clear flags
+  PMMIFG &= ~(SVSMHDLYIFG + SVSMLDLYIFG);
+  // SVS, SVM core and high side are now set to protect for the new core level
+  
   // Set VCore to new level
   PMMCTL0_L = PMMCOREV0 * level;
-
-  // Set also SVS highside and SVS low side to new level
-  PMMIFG &= ~(SVSHIFG | SVSMHDLYIFG | SVSLIFG | SVSMLDLYIFG);
-  SVSMHCTL |= SVSHE | SVSHFP | (SVSHRVL0 * level);
-  SVSMLCTL |= SVSLE | SVSLFP | (SVSLRVL0 * level);
-  // Wait until SVS high side and SVS low side is settled
-  while ((PMMIFG & SVSMHDLYIFG) == 0 || (PMMIFG & SVSMLDLYIFG) == 0);
-  // Disable full-performance mode to save energy
-  SVSMHCTL &= ~_HAL_PMM_SVSFP;
-// Disable SVS/SVM Low
-// Disable full-performance mode to save energy
-  SVSMLCTL &= ~(_HAL_PMM_DISABLE_SVSL_+_HAL_PMM_DISABLE_SVML_+_HAL_PMM_SVSFP );
-	
+  
+  // Restore Low side settings
+  // Clear all other bits _except_ level settings
+  SVSMLCTL &= (SVSLRVL0+SVSLRVL1+SVSMLRRL0+SVSMLRRL1+SVSMLRRL2);
+  
+  // Clear level settings in the backup register,keep all other bits
+  SVSMLCTL_backup &= ~(SVSLRVL0+SVSLRVL1+SVSMLRRL0+SVSMLRRL1+SVSMLRRL2);
+  
+  // Restore low-side SVS monitor settings
+  SVSMLCTL |= SVSMLCTL_backup;
+  
+  // Restore High side settings
+  // Clear all other bits except level settings
+  SVSMHCTL &= (SVSHRVL0+SVSHRVL1+SVSMHRRL0+SVSMHRRL1+SVSMHRRL2);
+  
+  // Clear level settings in the backup register, keep all other bits
+  SVSMHCTL_backup &= ~(SVSHRVL0+SVSHRVL1+SVSMHRRL0+SVSMHRRL1+SVSMHRRL2);
+  
+  // Restore backup 
+  SVSMHCTL |= SVSMHCTL_backup;
+  
+  // Wait until high side, low side settled
+  while (((PMMIFG & SVSMLDLYIFG) == 0) && ((PMMIFG & SVSMHDLYIFG) == 0));	
+  
   // Clear all Flags
   PMMIFG &= ~(SVMHVLRIFG | SVMHIFG | SVSMHDLYIFG | SVMLVLRIFG | SVMLIFG | SVSMLDLYIFG);
-  // backup PMM-Interrupt-Register
-  PMMRIE = PMMRIE_backup;
-  // Lock PMM registers for write access
-  PMMCTL0_H = 0x00;
-
-  if ((PMMIFG & SVMHIFG) == SVMHIFG)
-    return PMM_STATUS_ERROR;					 	// Highside is still to low for the adjusted VCore Level
-  else return PMM_STATUS_OK;						// Return: OK
+  
+  PMMRIE = PMMRIE_backup;                   // Restore PMM interrupt enable register
+  PMMCTL0_H = 0x00;                         // Lock PMM registers for write access
+  return PMM_STATUS_OK;		                // Return: OK
 }
 
+unsigned int SetVCore(unsigned char level)
+{
+  unsigned int actlevel;
+  unsigned int status;
+  
+  status = 0;
+  level &= PMMCOREV_3;                       // Set Mask for Max. level
+  actlevel = (PMMCTL0 & PMMCOREV_3);         // Get actual VCore
+                                             // step by step increase or decrease
+  while (((level != actlevel) && (status == 0)) || (level < actlevel)) {
+    if (level > actlevel) {
+      status = SetVCoreUp(++actlevel);
+    }
+    else {
+      status = SetVCoreDown(--actlevel);
+    }
+  }
+  
+  return status;
+}

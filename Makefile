@@ -1,5 +1,6 @@
 PROJECT1 = wireless-uart
 PROJECT2 = wireless-sensor
+PROJECT3 = main-fps
 
 CROSS_COMPILE = msp430-
 CC      = $(CROSS_COMPILE)gcc
@@ -49,7 +50,7 @@ CFLAGS  = -Wall -g -O0 -mmcu=cc430f5137 -I./HAL
 
 FEATURES += -DMHZ_433
 
-all: $(SRC) $(PROJECT1).c $(PROJECT1).elf $(PROJECT2).c $(PROJECT2).elf
+all: $(SRC) $(PROJECT1).c $(PROJECT1).elf $(PROJECT2).c $(PROJECT2).elf $(PROJECT3).c $(PROJECT3).elf
 
 $(PROJECT1).elf: $(OBJ) $(PROJECT1).o $(PROJECT1).c
 	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT1).o -o $@
@@ -57,10 +58,13 @@ $(PROJECT1).elf: $(OBJ) $(PROJECT1).o $(PROJECT1).c
 $(PROJECT2).elf: $(OBJ) $(PROJECT2).o $(PROJECT2).c
 	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT2).o -o $@
 
+$(PROJECT3).elf: $(OBJ) $(PROJECT3).o $(PROJECT3).c
+	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT3).o -o $@
+
 $(COBJ): %.o: %.c
 	$(CC) -c $(FEATURES) $(INC) $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(PROJECT1).elf $(PROJECT1).o $(PROJECT2).elf $(PROJECT2).o $(OBJ)
+	rm -f $(PROJECT1).elf $(PROJECT1).o $(PROJECT2).elf $(PROJECT2).o $(PROJECT3).elf $(PROJECT3).o $(OBJ)
 
 .PHONY: clean

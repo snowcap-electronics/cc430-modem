@@ -45,6 +45,11 @@
 
 static void send_message(uint16_t batt, uint16_t temp);
 
+#define RB_USE_RF                1
+#define RB_USE_ADC               1
+#define RB_USE_I2C               1
+#define RB_USE_SHUTDOWN_TMP275   0
+
 int main(void)
 {
   // Stop watchdog timer to prevent time out reset
@@ -57,12 +62,19 @@ int main(void)
   // FIXME: Nothing is received, if SMCLK is turned off
   //UCSCTL6 |= SMCLKOFF;
 
-  // Increase PMMCOREV level to 2 for proper radio operation
-  SetVCore(2);
+  SetVCore(0);
 
-  // Initialize Port J (JTAG)
-  //PJOUT = 0x00;
-  //PJDIR = 0xFF;
+  // Initialize all ports to output low
+  P1OUT = 0x00;
+  P1DIR = 0xFF;
+  P2OUT = 0x00;
+  P2DIR = 0xFF;
+  P3OUT = 0x00;
+  P3DIR = 0xFF;
+  P5OUT = 0x00;
+  P5DIR = 0xFF;
+  PJOUT = 0x00;
+  PJDIR = 0xFF;
 
   led_init();
 
@@ -71,7 +83,7 @@ int main(void)
   __bis_status_register(GIE);
   #endif
 
-  // Main loop: 
+  // Main loop:
   // - init i2c
   // - initiate tmp275 (will take 220ms) in one shot mode
   // - sleep 220
@@ -85,36 +97,49 @@ int main(void)
   // - wait for empty air
   // - send message
   // - shutdown radio
-  // - LPM3
+  // - LPM4
   // - sleep minutes
   while(1) {
     uint16_t adcbatt = 0;
     uint16_t temp = 0;
-    unsigned char RxStatus;
+
+    // Increase PMMCOREV level to 2 for proper radio operation
+    SetVCore(2);
 
     led_on(1);
 
+    #if RB_USE_I2C
     i2c_init();
+    #if RB_USE_SHUTDOWN_TMP275
+    tmp275_shutdown();
 
+    // FIXME: why i2c_shutdown increased the power consumption by 1-2mA?
+    //i2c_shutdown();
+    #else
     tmp275_start_oneshot();
+    #endif
+    #endif
 
-    timer_sleep_ms(220, LPM1_bits);
+    timer_sleep_ms(220, LPM4_bits);
     led_off(2);
 
-    adc_start(ADC_CHANNEL_BATTERY);
+    #if RB_USE_ADC
+    adc_start(ADC_CHANNEL_BATTERY, ADC12SHT0_6);
+    #endif
 
+    #if RB_USE_RF
     rf_init();
 
-    // Wait until radio idle
-    while (((RxStatus = Strobe(RF_SNOP)) & CC430_STATE_MASK) != CC430_STATE_IDLE) {
-      timer_sleep_ms(1, LPM1_bits);
-    }
+    rf_wait_for_idle();
 
     rf_receive_on();
+    #endif
 
+    #if RB_USE_ADC
     if (1) {
       uint8_t adc_timeout = 0;
 
+      // FIXME: implement adc_read() that return's the value or timeout
       // Wait until ADC ready, with timeout
       while (adc_state != ADC_DATA) {
         if (adc_timeout++ == 10) {
@@ -126,37 +151,44 @@ int main(void)
       if (adc_state == ADC_DATA) {
         adcbatt = adc_result;
       }
-    }
 
+      adc_shutdown();
+    }
+    #endif
+
+    #if RB_USE_I2C
+    #if RB_USE_SHUTDOWN_TMP275
+    // Do nothing if not using TMP275
+    #else
     // Read temperature from TMP275
     // FIXME: implement tmp275_read_temp() instead
     temp = i2c_read();
 
-    i2c_shutdown();
+    tmp275_shutdown();
 
-    {
-      // Send message and wait for completion of the tx, with timeout
-      uint8_t rf_timeout = 0;
-      send_message(adcbatt, temp);
+    // FIXME: why i2c_shutdown increased the power consumption by 1-2mA?
+    //i2c_shutdown();
+    #endif
+    #endif
 
-      while (rf_transmitting) {
-        if (rf_timeout++ == 20) {
-          break;
-        }
-        timer_sleep_ms(1, LPM1_bits);
-      }
-    }
+    #if RB_USE_RF
+    send_message(adcbatt, temp);
+    #endif
+
     led_on(2);
-    timer_sleep_ms(2*1000, LPM1_bits);
 
+    #if RB_USE_RF
     rf_shutdown();
+    #endif
 
     led_off(1);
     led_off(2);
 
-    timer_sleep_ms(4*1000, LPM3_bits);
+    SetVCore(0);
 
-    //timer_sleep_min(10, LPM3_bits);
+    timer_sleep_ms(4*1000, LPM4_bits);
+
+    //timer_sleep_min(10, LPM4_bits);
   }
 }
 
@@ -168,6 +200,7 @@ static void send_message(uint16_t adcbatt, uint16_t rawtemp)
 {
   unsigned char buf[UART_BUF_LEN];
   unsigned char len = 0;
+  uint8_t rf_timeout = 0;
 
   // Send battery level
   buf[len++] = 'B';
@@ -228,7 +261,15 @@ static void send_message(uint16_t adcbatt, uint16_t rawtemp)
 
   // Send the message
   rf_append_msg(buf, len);
-  rf_send_next_msg(RF_SEND_MSG_FULL);
+  rf_send_next_msg(RF_SEND_MSG_FORCE);
+
+  // Wait for completion of the tx, with timeout
+  while (rf_transmitting) {
+    if (rf_timeout++ == 20) {
+      break;
+    }
+    timer_sleep_ms(1, LPM1_bits);
+  }
 }
 
 

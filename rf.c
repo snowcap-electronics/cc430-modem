@@ -257,7 +257,7 @@ uint8_t rf_send_next_msg(enum RF_SEND_MSG force)
     if (len == -1) {
       // Enable interrupts
       __bis_status_register(GIE);
-      return;
+      return 0;
     }
   }
 
@@ -344,11 +344,27 @@ static void handle_rf_rx_packet(void)
 
   {
     // DEBUG: Write RSSI to UartTxBuffer
+    // Remove \r\n
+    UartTxBufferLength -= 2;
+    UartTxBuffer[UartTxBufferLength++] = ' ';
     unsigned char len;
     unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
     unsigned char value = RfRxBuffer[RfRxBufferLength - 2];
     unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
-    len = sc_itoa(value, buf, max_len);
+    int16_t rssi;
+
+    // Convert RSSI to 0-255, 255 being the best signal
+    if (value >= 128) {
+      rssi = value - 256;
+    } else {
+      rssi = value;
+    }
+    rssi -= 2*74; // double RSSI offset from data sheet
+
+    // turn negative value to 0-255, 255 being the best signal
+    rssi += 276;
+
+    len = sc_itoa(rssi, buf, max_len);
     if (len == 0) {
       UartTxBuffer[UartTxBufferLength] = 'X';
       ++len;
@@ -368,6 +384,7 @@ static void handle_rf_rx_packet(void)
       UartTxBuffer[UartTxBufferLength] = 'X';
       ++len;
     }
+    UartTxBuffer[UartTxBufferLength + len++] = '\r';
     UartTxBuffer[UartTxBufferLength + len++] = '\n';
     UartTxBufferLength += len;
   }

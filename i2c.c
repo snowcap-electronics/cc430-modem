@@ -178,6 +178,8 @@ void i2c_shutdown(void)
 {
   UCB0CTL1 |= UCSWRST;                      // Enable SW reset
   P1SEL &= ~(BIT2 + BIT3);                  // Unselect P1.2 & P1.3 to I2C function
+  P1OUT &= ~(BIT2 + BIT3);                  // Set low
+  P1DIR |= BIT2 + BIT3;                     // Set direction out
 }
 
 

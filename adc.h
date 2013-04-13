@@ -45,7 +45,7 @@ enum adc_state_t {
 extern enum adc_state_t adc_state;
 extern uint16_t         adc_result;
 
-void adc_start(unsigned char chan);
+void adc_start(unsigned char chan, unsigned int clks);
 void adc_shutdown(void);
 
 #endif

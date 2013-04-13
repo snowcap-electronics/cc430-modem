@@ -80,7 +80,7 @@ void ADC12_ISR(void)
 /*
  * Initiate a single ADC measure of the operating voltage
  */
-void adc_start(unsigned char chan)
+void adc_start(unsigned char chan, unsigned int clks)
 {
   ADC12CTL0  &= ~ADC12ENC;                     // Disable ADC
 
@@ -92,7 +92,7 @@ void adc_start(unsigned char chan)
 
   ADC12CTL2  |= ADC12RES_2;                    // 12bit resolution
 
-  ADC12CTL0   = ADC12SHT0_6 + ADC12ON;         // 128 clks
+  ADC12CTL0   = clks + ADC12ON;                // Enable ADC with specified sample-and-hold time
   ADC12CTL1   = ADC12SSEL1 + ADC12SHP;         // Select ACLK
 
   ADC12IE     = ADC12IE0;                      // enable ADC interrupt

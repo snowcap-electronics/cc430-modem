@@ -74,6 +74,7 @@ enum RF_SEND_MSG {
 };
 
 void rf_init(void);
+void rf_wait_for_idle(void);
 void rf_shutdown(void);
 void rf_receive_on(void);
 void rf_receive_off(void);

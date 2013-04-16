@@ -30,6 +30,7 @@
 #include "uart.h"
 #include "led.h"
 #include "utils.h"
+#include "timer.h"
 
 extern RF_SETTINGS rfSettings;
 

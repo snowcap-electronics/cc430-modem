@@ -46,6 +46,12 @@ static void handle_uart_rx_byte(void);
  */
 void uart_init(void)
 {
+  UartTxBuffer_i = 0;
+  UartTxBufferLength = 0;
+  uart_rx_timeout = 0;
+
+  UartRxBuffer_i = 0;
+
   PMAPPWD = 0x02D52;                        // Get write-access to port mapping regs
   P1MAP5 = PM_UCA0RXD;                      // Map UCA0RXD output to P1.6
   P1MAP6 = PM_UCA0TXD;                      // Map UCA0TXD output to P1.5

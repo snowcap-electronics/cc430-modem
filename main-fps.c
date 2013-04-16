@@ -119,7 +119,7 @@ int main(void)
     }
 
     // Wait for the ADC interrupt
-    while (adc_state != ADC_DATA) {}
+    while (adc_state != ADC_STATE_DATA) {}
 
     adc_prev = adc_result;
 

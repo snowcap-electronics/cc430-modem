@@ -29,8 +29,8 @@
 #include "adc.h"
 #include "led.h"
 
-enum adc_state_t adc_state;
-uint16_t         adc_result;
+adc_state_t adc_state;
+uint16_t    adc_result;
 
 
 /*
@@ -45,9 +45,9 @@ void ADC12_ISR(void)
   case  2: break;                           // Vector  2:  ADC overflow
   case  4: break;                           // Vector  4:  ADC timing overflow
   case  6:                                  // Vector  6:  ADC12IFG0
-    if (adc_state == ADC_MEASURING) {
+    if (adc_state == ADC_STATE_MEASURING) {
       adc_result = ADC12MEM0;
-      adc_state = ADC_DATA;
+      adc_state = ADC_STATE_DATA;
 
 #if SC_USE_SLEEP == 1
       // Exit active
@@ -97,7 +97,7 @@ void adc_start(unsigned char chan, unsigned int clks)
 
   ADC12IE     = ADC12IE0;                      // enable ADC interrupt
 
-  adc_state = ADC_MEASURING;
+  adc_state = ADC_STATE_MEASURING;
 
   ADC12CTL0 |= ADC12ENC + ADC12SC;             // Enable and start conversion
 

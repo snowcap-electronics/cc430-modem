@@ -35,15 +35,20 @@
 
 #define ADC_CHANNEL_BATTERY              11 // (AVCC - AVSS) / 2
 
-enum adc_state_t {
-  ADC_IDLE = 0,
-  ADC_START_PENDING,
-  ADC_MEASURING,
-  ADC_DATA
-};
+typedef enum adc_mode_t {
+  ADC_MODE_SINGLE,
+  ADC_MODE_CONT
+} adc_mode_t;
 
-extern enum adc_state_t adc_state;
-extern uint16_t         adc_result;
+typedef enum adc_state_t {
+  ADC_STATE_IDLE = 0,
+  ADC_STATE_START_PENDING,
+  ADC_STATE_MEASURING,
+  ADC_STATE_DATA
+} adc_state_t;
+
+extern adc_state_t adc_state;
+extern uint16_t    adc_result;
 
 void adc_start(unsigned char chan, unsigned int clks);
 void adc_shutdown(void);

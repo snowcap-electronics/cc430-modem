@@ -141,14 +141,14 @@ int main(void)
 
       // FIXME: implement adc_read() that return's the value or timeout
       // Wait until ADC ready, with timeout
-      while (adc_state != ADC_DATA) {
+      while (adc_state != ADC_STATE_DATA) {
         if (adc_timeout++ == 10) {
           break;
         }
         timer_sleep_ms(1, LPM1_bits);
       }
 
-      if (adc_state == ADC_DATA) {
+      if (adc_state == ADC_STATE_DATA) {
         adcbatt = adc_result;
       }
 

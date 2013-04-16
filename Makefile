@@ -46,7 +46,7 @@ INC = -I./HAL \
       -I/usr/msp430/include
 
 # Compile with debug for cc430f5137
-CFLAGS  = -Wall -g -O0 -mmcu=cc430f5137 -I./HAL
+CFLAGS  = -Wall -g -O0 -mmcu=cc430f5137 -I./HAL -Werror -Wno-error=unused-but-set-variable -Wno-error=unused-variable
 
 FEATURES += -DMHZ_433
 

@@ -29,6 +29,8 @@
 #ifndef RB_COMMON_H
 #define RB_COMMON_H
 
+#ifndef SC_USE_SLEEP
 #define SC_USE_SLEEP       1
+#endif
 
 #endif

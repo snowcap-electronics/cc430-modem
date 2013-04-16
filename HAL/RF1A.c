@@ -1,5 +1,6 @@
 #include "RF1A.h"
 #include "cc430x513x.h"
+#include <stdint.h>
 
 // *****************************************************************************
 // @fn          Strobe
@@ -227,11 +228,11 @@ void WriteBurstPATable(unsigned char *buffer, unsigned char count)
   volatile char i = 0; 
   
   while( !(RF1AIFCTL1 & RFINSTRIFG));
-  RF1AINSTRW = 0x7E00 + buffer[i];          // PA Table burst write   
+  RF1AINSTRW = 0x7E00 + buffer[(uint8_t)i];          // PA Table burst write   
 
   for (i = 1; i < count; i++)
   {
-    RF1ADINB = buffer[i];                   // Send data
+    RF1ADINB = buffer[(uint8_t)i];                   // Send data
     while (!(RFDINIFG & RF1AIFCTL1));       // Wait for TX to finish
   } 
   i = RF1ADOUTB;                            // Reset RFDOUTIFG flag which contains status byte

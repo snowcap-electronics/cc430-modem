@@ -30,12 +30,12 @@
 
 #define RB_I2C_MAX_RX_BYTES  8
 
-enum i2c_state_t i2c_rx_state;
-enum i2c_state_t i2c_tx_state;
+volatile enum i2c_state_t i2c_rx_state;
+volatile enum i2c_state_t i2c_tx_state;
 
-static unsigned char I2CTXByteCtr;                  // Bytes to send
-static unsigned char I2CRXByteCtr;                  // Bytes to receive
-static unsigned char *I2CPTxData;                   // Pointer to TX data
+static volatile unsigned char I2CTXByteCtr;                  // Bytes to send
+static volatile unsigned char I2CRXByteCtr;                  // Bytes to receive
+static volatile unsigned char *I2CPTxData;                   // Pointer to TX data
 static volatile unsigned char *I2CPRxData;          // Pointer to RX data
 static volatile unsigned char I2CRxBuffer[RB_I2C_MAX_RX_BYTES];       // I2C RX buffer
 

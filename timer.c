@@ -29,8 +29,8 @@
 #include "timer.h"
 #include "utils.h"
 
-static uint16_t timer_repeats = 0;
-uint8_t timer_occurred = 0;
+static volatile uint16_t timer_repeats = 0;
+volatile uint8_t timer_occurred = 0;
 
 /*
  * Timeout, repeat timer_repeats times, then wake up from sleep

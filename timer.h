@@ -34,7 +34,7 @@
 #include <msp430.h>
 #include <stdint.h>
 
-extern uint8_t timer_occurred;
+extern volatile uint8_t timer_occurred;
 
 void timer_sleep_ms(uint16_t ms, uint32_t mode);
 void timer_sleep_min(uint16_t min, uint32_t mode);

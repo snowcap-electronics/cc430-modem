@@ -40,8 +40,8 @@ enum i2c_state_t {
   I2C_READ_DATA
 };
 
-extern enum i2c_state_t i2c_rx_state;
-extern enum i2c_state_t i2c_tx_state;
+extern volatile enum i2c_state_t i2c_rx_state;
+extern volatile enum i2c_state_t i2c_tx_state;
 
 void i2c_init(void);
 void i2c_send(unsigned char *buf, unsigned char bytes);

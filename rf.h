@@ -41,8 +41,8 @@
 #define PACKET_LEN         (PAYLOAD_LEN + 3)   // PACKET_LEN = payload + len + RSSI + LQI
 #define RF_QUEUE_LEN       (PAYLOAD_LEN * 3)   // Space for several messages
 #define CRC_OK             (BIT7)              // CRC_OK bit
-#define PATABLE_VAL        (0xC3)              // +10 dBm output
-//#define PATABLE_VAL        (0x51)              // 0 dBm output
+//#define PATABLE_VAL        (0xC3)              // +10 dBm output
+#define PATABLE_VAL        (0x51)              // 0 dBm output
 
 
 #define CC430_STATE_TX                   (0x20)
@@ -54,19 +54,19 @@
 #define CC430_STATE_RX_OVERFLOW          (0x60)
 
 // Buffer for incoming data from RF
-extern unsigned char RfRxBuffer[PACKET_LEN];
-extern unsigned char RfRxBufferLength;
+extern volatile unsigned char RfRxBuffer[PACKET_LEN];
+extern volatile unsigned char RfRxBufferLength;
 
 // Queue for messages to be sent out over RF
-extern unsigned char RfTxQueue[RF_QUEUE_LEN];
-extern unsigned char RfTxQueue_i;
+extern volatile unsigned char RfTxQueue[RF_QUEUE_LEN];
+extern volatile unsigned char RfTxQueue_i;
 
 // Buffer for message currently being sent out over RF
-extern unsigned char RfTxBuffer[PACKET_LEN];
-extern unsigned char rf_error;
+extern volatile unsigned char RfTxBuffer[PACKET_LEN];
+extern volatile unsigned char rf_error;
 
-extern unsigned char rf_transmitting;
-extern unsigned char rf_receiving;
+extern volatile unsigned char rf_transmitting;
+extern volatile unsigned char rf_receiving;
 
 enum RF_SEND_MSG {
   RF_SEND_MSG_FULL,

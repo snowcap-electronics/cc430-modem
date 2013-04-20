@@ -35,19 +35,19 @@
 extern RF_SETTINGS rfSettings;
 
 // Buffer for incoming data from RF
-unsigned char RfRxBuffer[PACKET_LEN];
-unsigned char RfRxBufferLength = 0;
+volatile unsigned char RfRxBuffer[PACKET_LEN];
+volatile unsigned char RfRxBufferLength = 0;
 
 // Queue for messages to be sent out over RF
-unsigned char RfTxQueue[RF_QUEUE_LEN];
-unsigned char RfTxQueue_i = 0;
+volatile unsigned char RfTxQueue[RF_QUEUE_LEN];
+volatile unsigned char RfTxQueue_i = 0;
 
 // Buffer for outgoing data over RF
-unsigned char RfTxBuffer[PACKET_LEN];
-unsigned char rf_error = 0;
+volatile unsigned char RfTxBuffer[PACKET_LEN];
+volatile unsigned char rf_error = 0;
 
-unsigned char rf_transmitting = 0;
-unsigned char rf_receiving = 0;
+volatile unsigned char rf_transmitting = 0;
+volatile unsigned char rf_receiving = 0;
 
 static void transmit_msg(unsigned char *buffer, unsigned char length);
 static void handle_rf_rx_packet(void);
@@ -325,12 +325,14 @@ static void handle_rf_rx_packet(void)
   }
 
   // Read the packet data
-  ReadBurstReg(RF_RXFIFORD, RfRxBuffer, RfRxBufferLength);
+  ReadBurstReg(RF_RXFIFORD, (unsigned char *)RfRxBuffer, RfRxBufferLength);
 
   // Verify CRC
   if(!(RfRxBuffer[RfRxBufferLength - 1] & CRC_OK)) {
     goto rx_error;
   }
+
+  // FIXME: use uart API instead of directly poking the buffers
 
   // If there's not enough space for new data in uart tx buffer, discard new data
   if (UartTxBufferLength + (RfRxBufferLength - 3) > UART_BUF_LEN) {
@@ -349,7 +351,7 @@ static void handle_rf_rx_packet(void)
     UartTxBufferLength -= 2;
     UartTxBuffer[UartTxBufferLength++] = ' ';
     unsigned char len;
-    unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
+    volatile unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
     unsigned char value = RfRxBuffer[RfRxBufferLength - 2];
     unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
     int16_t rssi;
@@ -365,7 +367,7 @@ static void handle_rf_rx_packet(void)
     // turn negative value to 0-255, 255 being the best signal
     rssi += 276;
 
-    len = sc_itoa(rssi, buf, max_len);
+    len = sc_itoa(rssi, (unsigned char *)buf, max_len);
     if (len == 0) {
       UartTxBuffer[UartTxBufferLength] = 'X';
       ++len;
@@ -377,10 +379,10 @@ static void handle_rf_rx_packet(void)
   {
     // DEBUG: Write CRC/LQI to UartTxBuffer
     unsigned char len;
-    unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
+    volatile unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
     unsigned char value = RfRxBuffer[RfRxBufferLength - 1];
     unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
-    len = sc_itoa(value, buf, max_len);
+    len = sc_itoa(value, (unsigned char *)buf, max_len);
     if (len == 0) {
       UartTxBuffer[UartTxBufferLength] = 'X';
       ++len;

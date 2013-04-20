@@ -124,7 +124,7 @@ int main(void)
     led_off(2);
 
     #if RB_USE_ADC
-    adc_start(ADC_CHANNEL_BATTERY, ADC12SHT0_6);
+    adc_start(ADC_CHANNEL_BATTERY, ADC12SHT0_6, ADC_MODE_SINGLE);
     #endif
 
     #if RB_USE_RF

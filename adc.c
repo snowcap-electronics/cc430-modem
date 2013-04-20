@@ -29,9 +29,11 @@
 #include "adc.h"
 #include "led.h"
 
-adc_state_t adc_state;
-uint16_t    adc_result;
+volatile adc_state_t adc_state;
+volatile uint16_t adc_result;
 
+static volatile uint32_t adc_counter;
+static adc_mode_t adc_mode;
 
 /*
  * ADC interrupt
@@ -45,17 +47,14 @@ void ADC12_ISR(void)
   case  2: break;                           // Vector  2:  ADC overflow
   case  4: break;                           // Vector  4:  ADC timing overflow
   case  6:                                  // Vector  6:  ADC12IFG0
-    if (adc_state == ADC_STATE_MEASURING) {
-      adc_result = ADC12MEM0;
-      adc_state = ADC_STATE_DATA;
+    adc_result = ADC12MEM0;
+    adc_state = ADC_STATE_DATA;
 
+    ++adc_counter;
 #if SC_USE_SLEEP == 1
-      // Exit active
-      __bic_status_register_on_exit(LPM3_bits);
+    // Exit active
+    __bic_status_register_on_exit(LPM3_bits);
 #endif
-      return;
-    }
-
     break;
   case  8: break;                           // Vector  8:  ADC12IFG1
   case 10: break;                           // Vector 10:  ADC12IFG2
@@ -80,20 +79,31 @@ void ADC12_ISR(void)
 /*
  * Initiate a single ADC measure of the operating voltage
  */
-void adc_start(unsigned char chan, unsigned int clks)
+void adc_start(unsigned char chan, unsigned int clks, adc_mode_t mode)
 {
+  uint8_t mode_bits = 0;
+
+  adc_counter = 0;
+  adc_mode = mode;
+
   ADC12CTL0  &= ~ADC12ENC;                     // Disable ADC
 
   // Enable 2.0V shared reference, disable temperature sensor to save power
   REFCTL0 |= REFMSTR + REFVSEL_1 + REFON + REFTCOFF;
 
+  //FIXME: should ADC12MSC be added only for continuous mode?
+  ADC12CTL0   = clks + ADC12ON + ADC12MSC;     // Enable ADC with specified sample-and-hold time
+
+  ADC12CTL1   = ADC12SSEL1 + ADC12SHP;         // Select MCLK
+
+  if (mode == ADC_MODE_CONT) {
+    ADC12CTL1 |= ADC12CONSEQ_2;
+  }
+
   ADC12MCTL0  = ADC12SREF_1;                   // V(R+) = VREF+ and V(R-) = AVSS
   ADC12MCTL0 |= chan;                          // Measure channel
 
   ADC12CTL2  |= ADC12RES_2;                    // 12bit resolution
-
-  ADC12CTL0   = clks + ADC12ON;                // Enable ADC with specified sample-and-hold time
-  ADC12CTL1   = ADC12SSEL1 + ADC12SHP;         // Select ACLK
 
   ADC12IE     = ADC12IE0;                      // enable ADC interrupt
 
@@ -104,6 +114,28 @@ void adc_start(unsigned char chan, unsigned int clks)
 }
 
 
+/*
+ * Read latest ADC measurement and it's sequence number
+ */
+void adc_get_data(uint16_t *data, uint32_t *counter)
+{
+    // Disable interrupts to make sure data matches the counter
+  __bic_status_register(GIE);
+
+  *data = adc_result;
+  *counter = adc_counter;
+
+  // Reset the state
+  if (adc_mode == ADC_MODE_SINGLE) {
+    // FIXME: might not be exactly accurate..
+    adc_state = ADC_STATE_IDLE;
+  } else {
+    adc_state = ADC_STATE_MEASURING;
+  }
+
+  // Enable interrupts
+  __bis_status_register(GIE);
+}
 
 /*
  * Shutdown ADC to save power

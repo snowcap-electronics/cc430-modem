@@ -47,10 +47,11 @@ typedef enum adc_state_t {
   ADC_STATE_DATA
 } adc_state_t;
 
-extern adc_state_t adc_state;
-extern uint16_t    adc_result;
+extern volatile adc_state_t adc_state;
+extern volatile uint16_t    adc_result;
 
-void adc_start(unsigned char chan, unsigned int clks);
+void adc_start(unsigned char chan, unsigned int clks, adc_mode_t mode);
+void adc_get_data(uint16_t *data, uint32_t *counter);
 void adc_shutdown(void);
 
 #endif

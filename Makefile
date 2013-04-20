@@ -26,6 +26,8 @@ SRC =   adc.c \
 		uart.h \
 		utils.c \
 		utils.h \
+		fps.h \
+		fps.c \
 		common.h \
 		./HAL/RfRegSettings.c \
         ./HAL/RF1A.c \

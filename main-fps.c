@@ -151,11 +151,11 @@ int main(void)
                            low_limit,
                            high_limit,
                            high);
-
-      timestamp_last_frame = timestamp_ms;
-
       uart_tx_append_msg(buf, len);
       uart_send_next_msg();
+
+      timestamp_last_frame = timestamp_ms;
+      missed_adc = 0;
     }
   }
 }

@@ -33,6 +33,7 @@
 #include "rf.h"
 
 #include <msp430.h>
+#include <stdint.h>
 
 #define UART_BUF_LEN       (PAYLOAD_LEN * 3)   // Bigger buffers for uart
 
@@ -40,16 +41,18 @@
 //#define UART_RX_NEWDATA_TIMEOUT_MS       511   // 511ms timeout for sending current uart rx data
 
 // Buffer for incoming data from UART
-extern unsigned char UartRxBuffer[UART_BUF_LEN];
-extern unsigned char UartRxBuffer_i;
+extern volatile unsigned char UartRxBuffer[UART_BUF_LEN];
+extern volatile unsigned char UartRxBuffer_i;
 
 // Buffer for outoing data over UART
-extern unsigned char UartTxBuffer[UART_BUF_LEN];
-extern unsigned char UartTxBuffer_i;
-extern unsigned char UartTxBufferLength;
-extern unsigned char uart_rx_timeout;
+extern volatile unsigned char UartTxBuffer[UART_BUF_LEN];
+extern volatile unsigned char UartTxBuffer_i;
+extern volatile unsigned char UartTxBufferLength;
+extern volatile unsigned char uart_rx_timeout;
 
 
 void uart_init(void);
+uint8_t uart_tx_append_msg(unsigned char *buf, unsigned char len);
+void uart_send_next_msg(void);
 
 #endif

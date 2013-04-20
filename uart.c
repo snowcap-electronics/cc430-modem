@@ -29,14 +29,21 @@
 #include "uart.h"
 
 // Buffer for incoming data from UART
-unsigned char UartRxBuffer[UART_BUF_LEN];
-unsigned char UartRxBuffer_i = 0;
+volatile unsigned char UartRxBuffer[UART_BUF_LEN];
+volatile unsigned char UartRxBuffer_i = 0;
 
 // Buffer for outoing data over UART
-unsigned char UartTxBuffer[UART_BUF_LEN];
-unsigned char UartTxBuffer_i = 0;
-unsigned char UartTxBufferLength = 0;
-unsigned char uart_rx_timeout = 0;
+volatile unsigned char UartTxBuffer[UART_BUF_LEN];
+volatile unsigned char UartTxBuffer_i = 0;
+volatile unsigned char UartTxBufferLength = 0;
+volatile unsigned char uart_rx_timeout = 0;
+
+typedef enum uart_state_t {
+  UART_STATE_IDLE = 0,
+  UART_STATE_TX,
+} uart_state_t;
+
+static uart_state_t uart_state = UART_STATE_IDLE;
 
 static void handle_uart_rx_byte(void);
 
@@ -49,6 +56,7 @@ void uart_init(void)
   UartTxBuffer_i = 0;
   UartTxBufferLength = 0;
   uart_rx_timeout = 0;
+  uart_state = UART_STATE_IDLE;
 
   UartRxBuffer_i = 0;
 
@@ -96,6 +104,7 @@ void USCI_A0_ISR(void)
     if (++UartTxBuffer_i == UartTxBufferLength) { // All data sent?
       UartTxBuffer_i = 0;                   // Clear the Uart TX buffers
       UartTxBufferLength = 0;
+      uart_state = UART_STATE_IDLE;
       return;
     }
 
@@ -106,6 +115,53 @@ void USCI_A0_ISR(void)
     break;
   default: break;
   }
+}
+
+
+
+/*
+ * Append new message to transmit buffer
+ */
+uint8_t uart_tx_append_msg(unsigned char *buf, unsigned char len)
+{
+  int i;
+
+  // Disable interrupts to make sure UartTxBuffer state isn't modified in the middle
+  __bic_status_register(GIE);
+
+  // Check that there's enough space
+  if (UartTxBufferLength + len >= UART_BUF_LEN) {
+    // Enable interrupts
+    __bis_status_register(GIE);
+    return 0;
+  }
+
+  for (i = 0; i < len; ++i) {
+    UartTxBuffer[UartTxBufferLength + i] = buf[i];
+  }
+  UartTxBufferLength += i;
+
+  // Enable interrupts
+  __bis_status_register(GIE);
+
+  return i;
+}
+
+
+/*
+ * Start sending (unless already sending)
+ */
+void uart_send_next_msg(void)
+{
+   // Disable interrupts to make sure UartTxBuffer state isn't modified in the middle
+  __bic_status_register(GIE);
+
+  if (UartTxBufferLength > 0 && uart_state != UART_STATE_TX) {
+    uart_state = UART_STATE_TX;
+    UCA0TXBUF = UartTxBuffer[UartTxBuffer_i]; // Send first byte
+  }
+   // Enable interrupts
+  __bis_status_register(GIE);
 }
 
 

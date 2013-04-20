@@ -94,7 +94,7 @@ void adc_start(unsigned char chan, unsigned int clks, adc_mode_t mode)
   //FIXME: should ADC12MSC be added only for continuous mode?
   ADC12CTL0   = clks + ADC12ON + ADC12MSC;     // Enable ADC with specified sample-and-hold time
 
-  ADC12CTL1   = ADC12SSEL1 + ADC12SHP;         // Select MCLK
+  ADC12CTL1   = ADC12SSEL0 + ADC12SSEL1 + ADC12SHP;         // Select SMCLK
 
   if (mode == ADC_MODE_CONT) {
     ADC12CTL1 |= ADC12CONSEQ_2;

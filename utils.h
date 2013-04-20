@@ -30,8 +30,9 @@
 #define RB_UTILS_H
 
 #include "common.h"
+#include "stdint.h"
 
-unsigned char sc_itoa(int value, unsigned char *str, unsigned char len);
+unsigned char sc_itoa(int32_t value, unsigned char *str, unsigned char len);
 void busysleep_ms(int ms);
 
 #endif

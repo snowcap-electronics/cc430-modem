@@ -27,6 +27,7 @@
  */
 
 #include "utils.h"
+#include "stdint.h"
 
 
 
@@ -34,7 +35,7 @@
  * Convert int to string. Returns length on the converted string
  * (excluding the trailing \0) or 0 in error.
  */
-unsigned char sc_itoa(int value, unsigned char *str, unsigned char len)
+unsigned char sc_itoa(int32_t value, unsigned char *str, unsigned char len)
 {
   unsigned char index = len;
   unsigned char extra, i;
@@ -44,37 +45,37 @@ unsigned char sc_itoa(int value, unsigned char *str, unsigned char len)
 
   // Check for negative values
   if (value < 0) {
-	negative = 1;
-	value *= -1;
+    negative = 1;
+    value *= -1;
   }
 
   // Go through all numbers and store the last digit to the string
   // starting for the last character
   while (--index >= 0) {
-	str[index] = (value % 10) + '0';
-	if (value < 10) {
-	  break;
-	}
-	value /= 10;
+    str[index] = (value % 10) + '0';
+    if (value < 10) {
+      break;
+    }
+    value /= 10;
   }
 
   // Check for overflow (needs also space for '\0' and possible '-').
   if (index < 1 || (negative && index < 2)) {
-	str[0] = '\0';
-	return 0;
+    str[0] = '\0';
+    return 0;
   }
 
   // Add - for negative numbers
   if (negative) {
-	str[0] = '-';
-	start = 1;
+    str[0] = '-';
+    start = 1;
   }
 
   // Move numbers to the start of the string. Add \0 after the last
   // number or as the last character in case of overflow
   extra = index;
   for (i = 0; i < len - extra; i++) {
-	str[i + start] = str[i + extra];
+    str[i + start] = str[i + extra];
   }
   str_len = len - extra + start;
 

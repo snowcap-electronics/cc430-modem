@@ -93,7 +93,7 @@ int main(void)
 
     // If there is data received from UART, push it to RF.
     if (UartRxBuffer_i > 0) {
-      rf_append_msg(UartRxBuffer, UartRxBuffer_i);
+      rf_append_msg((unsigned char *)UartRxBuffer, UartRxBuffer_i);
       UartRxBuffer_i = 0;
       timer_set(UART_RX_NEWDATA_TIMEOUT_MS);
     }

@@ -114,7 +114,14 @@ int main(void)
     adc_get_data(&adc_value, &timestamp_ms);
 
     ++timestamp_counter;
-    missed_adc = timestamp_ms - timestamp_counter;
+    missed_adc += timestamp_ms - timestamp_counter;
+
+    led_count += timestamp_ms - timestamp_counter;
+    if (led_count++ > 100) {
+      led_count = 0;
+      led_toggle(1);
+    }
+
     timestamp_counter = timestamp_ms;
 
 #if 0
@@ -149,10 +156,6 @@ int main(void)
 
       uart_tx_append_msg(buf, len);
       uart_send_next_msg();
-    }
-    if (led_count++ > 100) {
-      led_count = 0;
-      led_toggle(1);
     }
   }
 }

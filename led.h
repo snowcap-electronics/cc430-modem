@@ -36,9 +36,9 @@
 
 #ifdef USE_DEBUG_LEDS
 #if (USE_DEBUG_LEDS >= 1)
-#define DEBUG_LED1_POUT    P2OUT
-#define DEBUG_LED1_PDIR    P2DIR
-#define DEBUG_LED1_BIT     BIT6                // P2.6, GPIO in RBv1
+#define DEBUG_LED1_POUT    P1OUT
+#define DEBUG_LED1_PDIR    P1DIR
+#define DEBUG_LED1_BIT     BIT6                // P1.6, TX/RX in RBv2
 #endif
 #if (USE_DEBUG_LEDS == 2)
 #define DEBUG_LED2_POUT    P1OUT

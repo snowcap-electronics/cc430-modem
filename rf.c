@@ -303,7 +303,6 @@ uint8_t rf_send_next_msg(enum RF_SEND_MSG force)
  */
 static void handle_rf_rx_packet(void)
 {
-  unsigned char x;
   unsigned char RxStatus;
 
   // Radio is in IDLE after receiving a message (See MCSM0 default values)
@@ -332,75 +331,12 @@ static void handle_rf_rx_packet(void)
     goto rx_error;
   }
 
-  // FIXME: use uart API instead of directly poking the buffers
+  led_toggle(1);
 
-  // If there's not enough space for new data in uart tx buffer, discard new data
-  if (UartTxBufferLength + (RfRxBufferLength - 3) > UART_BUF_LEN) {
-    goto failed_to_receive;
-  }
-
-  // Append the RF RX buffer to Uart TX, skipping the length, RSSI and CRC/Quality bytes
-  for (x = 0; x < RfRxBufferLength - 3; ++x) {
-    UartTxBuffer[UartTxBufferLength + x] = RfRxBuffer[x+1];
-  }
-  UartTxBufferLength += (RfRxBufferLength - 3);
-
-  {
-    // DEBUG: Write RSSI to UartTxBuffer
-    // Remove \r\n
-    UartTxBufferLength -= 2;
-    UartTxBuffer[UartTxBufferLength++] = ' ';
-    unsigned char len;
-    volatile unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
-    unsigned char value = RfRxBuffer[RfRxBufferLength - 2];
-    unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
-    int16_t rssi;
-
-    // Convert RSSI to 0-255, 255 being the best signal
-    if (value >= 128) {
-      rssi = value - 256;
-    } else {
-      rssi = value;
-    }
-    rssi -= 2*74; // double RSSI offset from data sheet
-
-    // turn negative value to 0-255, 255 being the best signal
-    rssi += 276;
-
-    len = sc_itoa(rssi, (unsigned char *)buf, max_len);
-    if (len == 0) {
-      UartTxBuffer[UartTxBufferLength] = 'X';
-      ++len;
-    }
-    UartTxBuffer[UartTxBufferLength + len++] = ' ';
-    UartTxBufferLength += len;
-  }
-
-  {
-    // DEBUG: Write CRC/LQI to UartTxBuffer
-    unsigned char len;
-    volatile unsigned char *buf = &UartTxBuffer[UartTxBufferLength];
-    unsigned char value = RfRxBuffer[RfRxBufferLength - 1];
-    unsigned char max_len = UART_BUF_LEN - UartTxBufferLength;
-    len = sc_itoa(value, (unsigned char *)buf, max_len);
-    if (len == 0) {
-      UartTxBuffer[UartTxBufferLength] = 'X';
-      ++len;
-    }
-    UartTxBuffer[UartTxBufferLength + len++] = '\r';
-    UartTxBuffer[UartTxBufferLength + len++] = '\n';
-    UartTxBufferLength += len;
-  }
-
-  // Send the first byte to Uart
-  //while (!(UCA0IFG&UCTXIFG));           // USCI_A0 TX buffer ready?
-  UCA0TXBUF = UartTxBuffer[UartTxBuffer_i]; // Send first byte
   return;
 
  rx_error:
   rf_error = 1;
-
- failed_to_receive:
   RfRxBufferLength = 0;
   return;
 }

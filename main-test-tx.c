@@ -48,13 +48,12 @@ static void send_message(uint16_t n);
 int main(void)
 {
   uint16_t seq = 0;
+  uint8_t rf_init_done = 0;
   // Stop watchdog timer to prevent time out reset
   WDTCTL = WDTPW + WDTHOLD;
 
   // Increase PMMCOREV level to 2 for proper radio operation
   SetVCore(2);
-
-  rf_init();
 
   // Initialize all GPIOs to input and others to output low
   P1OUT = 0x00;
@@ -95,6 +94,13 @@ int main(void)
 		busysleep_ms(500);
 	  }
 	}
+
+	if (!rf_init_done) {
+	  rf_init_done = 1;
+	  rf_init();
+	  rf_wait_for_idle();
+	}
+
 	send_message(seq++);
   }
 

@@ -32,8 +32,6 @@
 #include "utils.h"
 #include "timer.h"
 
-extern RF_SETTINGS rfSettings;
-
 // Buffer for incoming data from RF
 volatile unsigned char RfRxBuffer[PACKET_LEN];
 volatile unsigned char RfRxBufferLength = 0;
@@ -74,7 +72,7 @@ void rf_init(void)
   rf_transmitting = 0;
   rf_receiving = 0;
 
-  WriteRfSettings(&rfSettings);
+  WriteRfSettings();
 
   WriteSinglePATable(PATABLE_VAL);
 }

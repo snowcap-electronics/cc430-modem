@@ -163,42 +163,153 @@ void ResetRadioCore (void)
 // @param       RF_SETTINGS *pRfSettings  Pointer to the structure that holds the rf settings
 // @return      none
 // *****************************************************************************
-void WriteRfSettings(RF_SETTINGS *pRfSettings) {
-    WriteSingleReg(FSCTRL1,  pRfSettings->fsctrl1);
-    WriteSingleReg(FSCTRL0,  pRfSettings->fsctrl0);
-    WriteSingleReg(FREQ2,    pRfSettings->freq2);
-    WriteSingleReg(FREQ1,    pRfSettings->freq1);
-    WriteSingleReg(FREQ0,    pRfSettings->freq0);
-    WriteSingleReg(MDMCFG4,  pRfSettings->mdmcfg4);
-    WriteSingleReg(MDMCFG3,  pRfSettings->mdmcfg3);
-    WriteSingleReg(MDMCFG2,  pRfSettings->mdmcfg2);
-    WriteSingleReg(MDMCFG1,  pRfSettings->mdmcfg1);
-    WriteSingleReg(MDMCFG0,  pRfSettings->mdmcfg0);
-    WriteSingleReg(CHANNR,   pRfSettings->channr);
-    WriteSingleReg(DEVIATN,  pRfSettings->deviatn);
-    WriteSingleReg(FREND1,   pRfSettings->frend1);
-    WriteSingleReg(FREND0,   pRfSettings->frend0);
-    WriteSingleReg(MCSM0 ,   pRfSettings->mcsm0);
-    WriteSingleReg(FOCCFG,   pRfSettings->foccfg);
-    WriteSingleReg(BSCFG,    pRfSettings->bscfg);
-    WriteSingleReg(AGCCTRL2, pRfSettings->agcctrl2);
-    WriteSingleReg(AGCCTRL1, pRfSettings->agcctrl1);
-    WriteSingleReg(AGCCTRL0, pRfSettings->agcctrl0);
-    WriteSingleReg(FSCAL3,   pRfSettings->fscal3);
-    WriteSingleReg(FSCAL2,   pRfSettings->fscal2);
-    WriteSingleReg(FSCAL1,   pRfSettings->fscal1);
-    WriteSingleReg(FSCAL0,   pRfSettings->fscal0);
-    WriteSingleReg(FSTEST,   pRfSettings->fstest);
-    WriteSingleReg(TEST2,    pRfSettings->test2);
-    WriteSingleReg(TEST1,    pRfSettings->test1);
-    WriteSingleReg(TEST0,    pRfSettings->test0);
-    WriteSingleReg(FIFOTHR,  pRfSettings->fifothr);
-    WriteSingleReg(IOCFG2,   pRfSettings->iocfg2);
-    WriteSingleReg(IOCFG0,   pRfSettings->iocfg0);
-    WriteSingleReg(PKTCTRL1, pRfSettings->pktctrl1);
-    WriteSingleReg(PKTCTRL0, pRfSettings->pktctrl0);
-    WriteSingleReg(ADDR,     pRfSettings->addr);
-    WriteSingleReg(PKTLEN,   pRfSettings->pktlen);
+void WriteRfSettings(void) {
+
+//#define RF_MODE_OPTIMISED_CONSUMPTION 1
+#define RF_MODE_OPTIMISED_SENSITIVITY 1
+
+#ifdef RF_MODE_OPTIMISED_CONSUMPTION
+/* Sync word qualifier mode = 30/32 sync word bits detected */
+/* CRC autoflush = false */
+/* Channel spacing = 199.951172 */
+/* Data format = Normal mode */
+/* Data rate = 38.3835 */
+/* RX filter BW = 101.562500 */
+/* PA ramping = false */
+/* Preamble count = 4 */
+/* Whitening = false */
+/* Address config = No address check */
+/* Carrier frequency = 433.999969 */
+/* Device address = 0 */
+/* TX power = 0 */
+/* Manchester enable = false */
+/* CRC enable = true */
+/* Deviation = 20.629883 */
+/* Packet length mode = Variable packet length mode. Packet length configured by the first byte after sync word */
+/* Packet length = 255 */
+/* Modulation format = 2-GFSK */
+/* Base frequency = 433.999969 */
+/* Modulated = true */
+/* Channel number = 0 */
+/* RF settings SoC: CC430 */
+    WriteSingleReg(IOCFG2      , 0x29); // gdo2 output configuration
+    WriteSingleReg(IOCFG1      , 0x2E); // gdo1 output configuration
+    WriteSingleReg(IOCFG0      , 0x06); // gdo0 output configuration
+    WriteSingleReg(FIFOTHR     , 0x47); // rx fifo and tx fifo thresholds
+    WriteSingleReg(SYNC1       , 0xD3); // sync word, high byte
+    WriteSingleReg(SYNC0       , 0x91); // sync word, low byte
+    WriteSingleReg(PKTLEN      , 0x32); // packet length
+    WriteSingleReg(PKTCTRL1    , 0x04); // packet automation control
+    WriteSingleReg(PKTCTRL0    , 0x05); // packet automation control
+    WriteSingleReg(ADDR        , 0x00); // device address
+    WriteSingleReg(CHANNR      , 0x00); // channel number
+    WriteSingleReg(FSCTRL1     , 0x08); // frequency synthesizer control
+    WriteSingleReg(FSCTRL0     , 0x00); // frequency synthesizer control
+    WriteSingleReg(FREQ2       , 0x10); // frequency control word, high byte
+    WriteSingleReg(FREQ1       , 0xB1); // frequency control word, middle byte
+    WriteSingleReg(FREQ0       , 0x3B); // frequency control word, low byte
+    WriteSingleReg(MDMCFG4     , 0xCA); // modem configuration
+    WriteSingleReg(MDMCFG3     , 0x83); // modem configuration
+    WriteSingleReg(MDMCFG2     , 0x93); // modem configuration
+    WriteSingleReg(MDMCFG1     , 0x22); // modem configuration
+    WriteSingleReg(MDMCFG0     , 0xF8); // modem configuration
+    WriteSingleReg(DEVIATN     , 0x35); // modem deviation setting
+    WriteSingleReg(MCSM2       , 0x07); // main radio control state machine configuration
+    WriteSingleReg(MCSM1       , 0x30); // main radio control state machine configuration
+    WriteSingleReg(MCSM0       , 0x10); // main radio control state machine configuration
+    WriteSingleReg(FOCCFG      , 0x16); // frequency offset compensation configuration
+    WriteSingleReg(BSCFG       , 0x6C); // bit synchronization configuration
+    WriteSingleReg(AGCCTRL2    , 0x43); // agc control
+    WriteSingleReg(AGCCTRL1    , 0x40); // agc control
+    WriteSingleReg(AGCCTRL0    , 0x91); // agc control
+    WriteSingleReg(WOREVT1     , 0x80); // high byte event0 timeout
+    WriteSingleReg(WOREVT0     , 0x00); // low byte event0 timeout
+    WriteSingleReg(WORCTRL     , 0xFB); // wake on radio control
+    WriteSingleReg(FREND1      , 0x56); // front end rx configuration
+    WriteSingleReg(FREND0      , 0x10); // front end tx configuration
+    WriteSingleReg(FSCAL3      , 0xE9); // frequency synthesizer calibration
+    WriteSingleReg(FSCAL2      , 0x2A); // frequency synthesizer calibration
+    WriteSingleReg(FSCAL1      , 0x00); // frequency synthesizer calibration
+    WriteSingleReg(FSCAL0      , 0x1F); // frequency synthesizer calibration
+    WriteSingleReg(FSTEST      , 0x59); // frequency synthesizer calibration control
+    WriteSingleReg(PTEST       , 0x7F); // production test
+    WriteSingleReg(AGCTEST     , 0x3F); // agc test
+    WriteSingleReg(TEST2       , 0x81); // various test settings
+    WriteSingleReg(TEST1       , 0x35); // various test settings
+    WriteSingleReg(TEST0       , 0x09); // various test settings
+#endif
+
+#ifdef RF_MODE_OPTIMISED_SENSITIVITY
+/* Sync word qualifier mode = 30/32 sync word bits detected */
+/* CRC autoflush = false */
+/* Channel spacing = 199.951172 */
+/* Data format = Normal mode */
+/* Data rate = 38.3835 */
+/* RX filter BW = 101.562500 */
+/* PA ramping = false */
+/* Preamble count = 4 */
+/* Whitening = false */
+/* Address config = No address check */
+/* Carrier frequency = 433.999969 */
+/* Device address = 0 */
+/* TX power = 0 */
+/* Manchester enable = false */
+/* CRC enable = true */
+/* Deviation = 20.629883 */
+/* Packet length mode = Variable packet length mode. Packet length configured by the first byte after sync word */
+/* Packet length = 255 */
+/* Modulation format = 2-GFSK */
+/* Base frequency = 433.999969 */
+/* Modulated = true */
+/* Channel number = 0 */
+/* RF settings SoC: CC430 */
+    WriteSingleReg(IOCFG2      , 0x29); // gdo2 output configuration
+    WriteSingleReg(IOCFG1      , 0x2E); // gdo1 output configuration
+    WriteSingleReg(IOCFG0      , 0x06); // gdo0 output configuration
+    WriteSingleReg(FIFOTHR     , 0x47); // rx fifo and tx fifo thresholds
+    WriteSingleReg(SYNC1       , 0xD3); // sync word, high byte
+    WriteSingleReg(SYNC0       , 0x91); // sync word, low byte
+    WriteSingleReg(PKTLEN      , 0xFF); // packet length
+    WriteSingleReg(PKTCTRL1    , 0x04); // packet automation control
+    WriteSingleReg(PKTCTRL0    , 0x05); // packet automation control
+    WriteSingleReg(ADDR        , 0x00); // device address
+    WriteSingleReg(CHANNR      , 0x00); // channel number
+    WriteSingleReg(FSCTRL1     , 0x06); // frequency synthesizer control
+    WriteSingleReg(FSCTRL0     , 0x00); // frequency synthesizer control
+    WriteSingleReg(FREQ2       , 0x10); // frequency control word, high byte
+    WriteSingleReg(FREQ1       , 0xB1); // frequency control word, middle byte
+    WriteSingleReg(FREQ0       , 0x3B); // frequency control word, low byte
+    WriteSingleReg(MDMCFG4     , 0xCA); // modem configuration
+    WriteSingleReg(MDMCFG3     , 0x83); // modem configuration
+    WriteSingleReg(MDMCFG2     , 0x13); // modem configuration
+    WriteSingleReg(MDMCFG1     , 0x22); // modem configuration
+    WriteSingleReg(MDMCFG0     , 0xF8); // modem configuration
+    WriteSingleReg(DEVIATN     , 0x35); // modem deviation setting
+    WriteSingleReg(MCSM2       , 0x07); // main radio control state machine configuration
+    WriteSingleReg(MCSM1       , 0x30); // main radio control state machine configuration
+    WriteSingleReg(MCSM0       , 0x10); // main radio control state machine configuration
+    WriteSingleReg(FOCCFG      , 0x16); // frequency offset compensation configuration
+    WriteSingleReg(BSCFG       , 0x6C); // bit synchronization configuration
+    WriteSingleReg(AGCCTRL2    , 0x43); // agc control
+    WriteSingleReg(AGCCTRL1    , 0x40); // agc control
+    WriteSingleReg(AGCCTRL0    , 0x91); // agc control
+    WriteSingleReg(WOREVT1     , 0x80); // high byte event0 timeout
+    WriteSingleReg(WOREVT0     , 0x00); // low byte event0 timeout
+    WriteSingleReg(WORCTRL     , 0xFB); // wake on radio control
+    WriteSingleReg(FREND1      , 0x56); // front end rx configuration
+    WriteSingleReg(FREND0      , 0x10); // front end tx configuration
+    WriteSingleReg(FSCAL3      , 0xE9); // frequency synthesizer calibration
+    WriteSingleReg(FSCAL2      , 0x2A); // frequency synthesizer calibration
+    WriteSingleReg(FSCAL1      , 0x00); // frequency synthesizer calibration
+    WriteSingleReg(FSCAL0      , 0x1F); // frequency synthesizer calibration
+    WriteSingleReg(FSTEST      , 0x59); // frequency synthesizer calibration control
+    WriteSingleReg(PTEST       , 0x7F); // production test
+    WriteSingleReg(AGCTEST     , 0x3F); // agc test
+    WriteSingleReg(TEST2       , 0x81); // various test settings
+    WriteSingleReg(TEST1       , 0x35); // various test settings
+    WriteSingleReg(TEST0       , 0x09); // various test settings
+#endif
+
 }
 
 // *****************************************************************************

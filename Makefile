@@ -29,7 +29,6 @@ SRC =   adc.c \
 		fps.h \
 		fps.c \
 		common.h \
-		./HAL/RfRegSettings.c \
         ./HAL/RF1A.c \
         ./HAL/hal_pmm.c \
         ./HAL/hal_pmm.h \

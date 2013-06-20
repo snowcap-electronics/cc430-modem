@@ -186,7 +186,7 @@ void WriteRfSettings(void) {
 /* CRC enable = true */
 /* Deviation = 20.629883 */
 /* Packet length mode = Variable packet length mode. Packet length configured by the first byte after sync word */
-/* Packet length = 255 */
+/* Packet length = 32 */
 /* Modulation format = 2-GFSK */
 /* Base frequency = 433.999969 */
 /* Modulated = true */
@@ -257,7 +257,7 @@ void WriteRfSettings(void) {
 /* CRC enable = true */
 /* Deviation = 20.629883 */
 /* Packet length mode = Variable packet length mode. Packet length configured by the first byte after sync word */
-/* Packet length = 255 */
+/* Packet length = 32 */
 /* Modulation format = 2-GFSK */
 /* Base frequency = 433.999969 */
 /* Modulated = true */
@@ -269,7 +269,7 @@ void WriteRfSettings(void) {
     WriteSingleReg(FIFOTHR     , 0x47); // rx fifo and tx fifo thresholds
     WriteSingleReg(SYNC1       , 0xD3); // sync word, high byte
     WriteSingleReg(SYNC0       , 0x91); // sync word, low byte
-    WriteSingleReg(PKTLEN      , 0xFF); // packet length
+    WriteSingleReg(PKTLEN      , 0x32); // packet length
     WriteSingleReg(PKTCTRL1    , 0x04); // packet automation control
     WriteSingleReg(PKTCTRL0    , 0x05); // packet automation control
     WriteSingleReg(ADDR        , 0x00); // device address

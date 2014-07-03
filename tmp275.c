@@ -38,7 +38,7 @@ void tmp275_start_oneshot(void)
     tx_data[0] = 0x1;
 
     /* Configuration:
-       Shutdown mode: 0
+       Shutdown mode: 1
        Thermostat mode: 0
        Polarity: 0
        Fault queue: 00

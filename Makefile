@@ -1,6 +1,7 @@
 PROJECT1 = wireless-uart
 PROJECT2 = wireless-sensor
 PROJECT3 = main-fps
+PROJECT4 = wireless-power-led
 
 CROSS_COMPILE = msp430-
 CC      = $(CROSS_COMPILE)gcc
@@ -28,6 +29,8 @@ SRC =   adc.c \
 		utils.h \
 		fps.h \
 		fps.c \
+		comp.h \
+		comp.c \
 		common.h \
         ./HAL/RF1A.c \
         ./HAL/hal_pmm.c \
@@ -51,7 +54,7 @@ CFLAGS  = -Wall -g -O0 -mmcu=cc430f5137 -I./HAL -Werror -Wno-error=unused-but-se
 
 FEATURES += -DMHZ_433
 
-all: $(SRC) $(PROJECT1).c $(PROJECT1).elf $(PROJECT2).c $(PROJECT2).elf $(PROJECT3).c $(PROJECT3).elf
+all: $(SRC) $(PROJECT1).c $(PROJECT1).elf $(PROJECT2).c $(PROJECT2).elf $(PROJECT3).c $(PROJECT3).elf $(PROJECT4).c $(PROJECT4).elf
 
 $(PROJECT1).elf: $(OBJ) $(PROJECT1).o $(PROJECT1).c
 	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT1).o -o $@
@@ -62,10 +65,17 @@ $(PROJECT2).elf: $(OBJ) $(PROJECT2).o $(PROJECT2).c
 $(PROJECT3).elf: $(OBJ) $(PROJECT3).o $(PROJECT3).c
 	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT3).o -o $@
 
+$(PROJECT4).elf: $(OBJ) $(PROJECT4).o $(PROJECT4).c
+	$(LD) $(LDFLAGS) $(OBJ) $(PROJECT4).o -o $@
+
 $(COBJ): %.o: %.c
 	$(CC) -c $(FEATURES) $(INC) $(CFLAGS) $< -o $@
 
 clean:
-	rm -f $(PROJECT1).elf $(PROJECT1).o $(PROJECT2).elf $(PROJECT2).o $(PROJECT3).elf $(PROJECT3).o $(OBJ)
+	rm -f $(OBJ)
+	rm -f $(PROJECT1).elf $(PROJECT1).o
+	rm -f $(PROJECT2).elf $(PROJECT2).o
+	rm -f $(PROJECT3).elf $(PROJECT3).o
+	rm -f $(PROJECT4).elf $(PROJECT4).o
 
 .PHONY: clean

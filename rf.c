@@ -87,7 +87,7 @@ void rf_wait_for_idle(void)
   unsigned char RxStatus;
 
   while (((RxStatus = Strobe(RF_SNOP)) & CC430_STATE_MASK) != CC430_STATE_IDLE) {
-    timer_sleep_ms(1, LPM1_bits);
+    busysleep_us(10);
   }
 }
 

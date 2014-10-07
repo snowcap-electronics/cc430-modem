@@ -33,7 +33,11 @@
 #include <msp430.h>
 #include <stdint.h>
 
-#define ADC_CHANNEL_BATTERY              11 // (AVCC - AVSS) / 2
+#define ADC_CHANNEL_0           ADC12INCH_0
+#define ADC_CHANNEL_1           ADC12INCH_1
+#define ADC_CHANNEL_2           ADC12INCH_2
+#define ADC_CHANNEL_3           ADC12INCH_3
+#define ADC_CHANNEL_BATTERY     ADC12INCH_11 // (AVCC - AVSS) / 2
 
 typedef enum adc_mode_t {
   ADC_MODE_SINGLE,
@@ -48,10 +52,9 @@ typedef enum adc_state_t {
 } adc_state_t;
 
 extern volatile adc_state_t adc_state;
-extern volatile uint16_t    adc_result;
 
-void adc_start(unsigned char chan, unsigned int clks, adc_mode_t mode);
-void adc_get_data(uint16_t *data, uint32_t *counter);
+void adc_start(uint8_t ch_count, uint8_t *chan, unsigned int clks, adc_mode_t mode);
+void adc_get_data(uint8_t ch, uint16_t *data, uint32_t *counter);
 void adc_shutdown(void);
 
 #endif

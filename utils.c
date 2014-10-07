@@ -100,6 +100,20 @@ void busysleep_ms(int ms)
 
 
 
+/*
+ * Busy loop sleep ms microseconds.
+ */
+void busysleep_us(int us)
+{
+  int a;
+  for (a = 0; a < us; a++) {
+    __delay_cycles(1);
+  }
+}
+
+
+
+
 /* Emacs indentatation information
    Local Variables:
    indent-tabs-mode:nil

@@ -34,5 +34,6 @@
 
 unsigned char sc_itoa(int32_t value, unsigned char *str, unsigned char len);
 void busysleep_ms(int ms);
+void busysleep_us(int us);
 
 #endif

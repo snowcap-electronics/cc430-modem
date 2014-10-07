@@ -45,7 +45,7 @@ void tmp275_start_oneshot(void)
        Resolution: 11 (12 bits)
        One-shot: 1
     */
-    tx_data[1] = 0b11100000;
+    tx_data[1] = 0b11100001;
     i2c_send(tx_data, 2);
 
     // FIXME: move out side this function?
@@ -64,12 +64,12 @@ void tmp275_shutdown(void)
     tx_data[0] = 0x1;
 
     /* Configuration:
-       Shutdown mode: 0
+       Shutdown mode: 1
        Thermostat mode: 0
        Polarity: 0
        Fault queue: 00
        Resolution: 11 (12 bits)
-       One-shot: 1
+       One-shot: 0
     */
     tx_data[1] = 0b01100001;
     i2c_send(tx_data, 2);

@@ -102,6 +102,7 @@ int main(void)
   while(1) {
     uint16_t adcbatt = 0;
     uint16_t temp = 0;
+    uint8_t channels[1] = {ADC_CHANNEL_BATTERY};
 
     // Increase PMMCOREV level to 2 for proper radio operation
     SetVCore(2);
@@ -124,7 +125,7 @@ int main(void)
     led_off(2);
 
     #if RB_USE_ADC
-    adc_start(ADC_CHANNEL_BATTERY, ADC12SHT0_6, ADC_MODE_SINGLE);
+    adc_start(sizeof(channels), channels, ADC12SHT0_6, ADC_MODE_SINGLE);
     #endif
 
     #if RB_USE_RF
@@ -149,7 +150,7 @@ int main(void)
       }
 
       if (adc_state == ADC_STATE_DATA) {
-        adcbatt = adc_result;
+        adc_get_data(1, &adcbatt, (void*)0);
       }
 
       adc_shutdown();

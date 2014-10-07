@@ -61,7 +61,7 @@ int main(void)
   uint8_t led_count = 0;
   uint32_t timestamp_counter = 0;
   uint32_t timestamp_last_frame = 0;
-
+  uint8_t channels[1] = {ADC12INCH_3};
   // Stop watchdog timer to prevent time out reset
   WDTCTL = WDTPW + WDTHOLD;
 
@@ -96,7 +96,7 @@ int main(void)
   #endif
 
   // Initiate channel A3 measurement @ 1000 Hz
-  adc_start(ADC12INCH_3, ADC12SHT03 | ADC12SHT02, ADC_MODE_CONT);
+  adc_start(sizeof(channels), channels, ADC12SHT03 | ADC12SHT02, ADC_MODE_CONT);
 
   while(1) {
     uint8_t fps;
@@ -111,7 +111,7 @@ int main(void)
     // Wait for the ADC interrupt
     while (adc_state != ADC_STATE_DATA) {}
 
-    adc_get_data(&adc_value, &timestamp_ms);
+    adc_get_data(1, &adc_value, &timestamp_ms);
 
     ++timestamp_counter;
     missed_adc += timestamp_ms - timestamp_counter;

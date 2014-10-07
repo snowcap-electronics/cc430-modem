@@ -126,8 +126,9 @@ int main(void)
     #if RB_USE_ADC
     if (1) {
       uint8_t adc_timeout = 0;
+      uint8_t channels[1] = {ADC_CHANNEL_BATTERY};
 
-      adc_start(ADC_CHANNEL_BATTERY, ADC12SHT0_6, ADC_MODE_SINGLE);
+      adc_start(sizeof(channels), channels, ADC12SHT0_6, ADC_MODE_SINGLE);
 
       // FIXME: implement adc_read() that returns the value or timeout
       // Wait until ADC ready, with timeout
@@ -139,7 +140,7 @@ int main(void)
       }
 
       if (adc_state == ADC_STATE_DATA) {
-        adcbatt = adc_result;
+        adc_get_data(1, &adcbatt, (void*)0);
       }
 
       adc_shutdown();

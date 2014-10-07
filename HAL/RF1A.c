@@ -192,9 +192,9 @@ void WriteRfSettings(void) {
 /* Modulated = true */
 /* Channel number = 0 */
 /* RF settings SoC: CC430 */
-    WriteSingleReg(IOCFG2      , 0x29); // gdo2 output configuration
-    WriteSingleReg(IOCFG1      , 0x2E); // gdo1 output configuration
-    WriteSingleReg(IOCFG0      , 0x06); // gdo0 output configuration
+    WriteSingleReg(IOCFG2      , 0x29); // gdo2 output configuration, 0x29 == RF_RDY
+    WriteSingleReg(IOCFG1      , 0x2E); // gdo1 output configuration, 0x2E == tristate (meaning what?), not even connected in RBv2
+    WriteSingleReg(IOCFG0      , 0x06); // gdo0 output configuration, 0x06 == Assert on sync word
     WriteSingleReg(FIFOTHR     , 0x47); // rx fifo and tx fifo thresholds
     WriteSingleReg(SYNC1       , 0xD3); // sync word, high byte
     WriteSingleReg(SYNC0       , 0x91); // sync word, low byte
@@ -263,9 +263,9 @@ void WriteRfSettings(void) {
 /* Modulated = true */
 /* Channel number = 0 */
 /* RF settings SoC: CC430 */
-    WriteSingleReg(IOCFG2      , 0x29); // gdo2 output configuration
-    WriteSingleReg(IOCFG1      , 0x2E); // gdo1 output configuration
-    WriteSingleReg(IOCFG0      , 0x06); // gdo0 output configuration
+    WriteSingleReg(IOCFG2      , 0x29); // gdo2 output configuration, 0x29 == RF_RDY
+    WriteSingleReg(IOCFG1      , 0x2E); // gdo1 output configuration, 0x2E == tristate (meaning what?), not even connected in RBv2
+    WriteSingleReg(IOCFG0      , 0x06); // gdo0 output configuration, 0x06 == Assert on sync word
     WriteSingleReg(FIFOTHR     , 0x47); // rx fifo and tx fifo thresholds
     WriteSingleReg(SYNC1       , 0xD3); // sync word, high byte
     WriteSingleReg(SYNC0       , 0x91); // sync word, low byte

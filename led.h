@@ -32,18 +32,18 @@
 #include "common.h"
 #include <msp430.h>
 
-#define USE_DEBUG_LEDS     2                   // No of debug leds
+#define USE_DEBUG_LEDS     2                   // Amount of debug leds
 
 #ifdef USE_DEBUG_LEDS
 #if (USE_DEBUG_LEDS >= 1)
 #define DEBUG_LED1_POUT    P2OUT
 #define DEBUG_LED1_PDIR    P2DIR
-#define DEBUG_LED1_BIT     BIT6                // P2.6, GPIO in RBv1
+#define DEBUG_LED1_BIT     BIT6                // P2.6, GPIO in RBv1 and v2
 #endif
 #if (USE_DEBUG_LEDS == 2)
 #define DEBUG_LED2_POUT    P1OUT
 #define DEBUG_LED2_PDIR    P1DIR
-#define DEBUG_LED2_BIT     BIT4                // P1.4, SPI in RBv1
+#define DEBUG_LED2_BIT     BIT4                // P1.4, SPI in RBv1 and v2
 #endif
 #endif
 

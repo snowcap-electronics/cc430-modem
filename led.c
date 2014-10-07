@@ -34,14 +34,14 @@
  */
 void led_init(void)
 {
-  // Set up LEDs (no leds in Radio Board v1)
+  // Set up LEDs
 #if (USE_DEBUG_LEDS >= 1)
-  // P1.0 (GPIO in Radio Board v1)
+  // P1.0 (GPIO in Radio Board v1 and v2)
   DEBUG_LED1_POUT &= ~DEBUG_LED1_BIT;
   DEBUG_LED1_PDIR |= DEBUG_LED1_BIT;
 #endif
 #if (USE_DEBUG_LEDS == 2)
-  // P1.2 (SPI in Radio Board v1)
+  // P1.2 (SPI in Radio Board v1 and v2)
   DEBUG_LED2_POUT &= ~DEBUG_LED2_BIT;
   DEBUG_LED2_PDIR |= DEBUG_LED2_BIT;
 #endif

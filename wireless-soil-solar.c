@@ -170,7 +170,7 @@ int main(void)
       // 0x34 == RFCLK/4  (6.5MHz)
       // 0x32 == RFCLK/2  (13MHz)
       // 0x30 == RFCLK/1  (26MHz)
-      WriteSingleReg(IOCFG2, 0x39);
+      WriteSingleReg(IOCFG2, 0x38);
 
       // Enable TEMP_ADJ_VCC
       P1OUT |= BIT4;

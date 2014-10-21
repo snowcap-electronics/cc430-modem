@@ -41,8 +41,8 @@
 #define PACKET_LEN         (PAYLOAD_LEN + 3)   // PACKET_LEN = payload + len + RSSI + LQI
 #define RF_QUEUE_LEN       (PAYLOAD_LEN * 3)   // Space for several messages
 #define CRC_OK             (BIT7)              // CRC_OK bit
-//#define PATABLE_VAL        (0xC3)              // +10 dBm output
-#define PATABLE_VAL        (0x51)              // 0 dBm output
+#define PATABLE_VAL        (0xC3)              // +10 dBm output
+//#define PATABLE_VAL        (0x51)              // 0 dBm output
 
 
 #define CC430_STATE_TX                   (0x20)

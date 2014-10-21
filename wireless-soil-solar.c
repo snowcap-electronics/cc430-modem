@@ -241,7 +241,9 @@ static void send_message(uint32_t *adc, uint16_t rawtemp)
 
   // Append tx counter
   buf[len++] = 'S';
-  buf[len++] = ':';
+  buf[len++] = '[';
+  buf[len++] = '0';
+  buf[len++] = ']';
   buf[len++] = ' ';
   len += sc_itoa(tx_count, &buf[len], UART_BUF_LEN - len);
   buf[len++] = ' ';

@@ -100,8 +100,8 @@ void adc_start(uint8_t ch_count, uint8_t *chan, unsigned int clks, adc_mode_t mo
 
   ADC12CTL0  &= ~ADC12ENC;                     // Disable ADC
 
-  // Enable 2.5V shared reference
-  REFCTL0 |= REFMSTR + REFVSEL_2 + REFON;
+  // Enable 2.0 shared reference
+  REFCTL0 |= REFMSTR + REFVSEL_1 + REFON;
 
   ADC12CTL0   = clks + ADC12ON;                // Enable ADC with specified sample-and-hold time
 

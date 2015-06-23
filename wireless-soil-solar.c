@@ -46,10 +46,23 @@
 
 #define DEBUG_MODE 0
 
-// FIXME: these probably will change per temperature?
+#ifndef SUPER_CAP_COUNT
+#define SUPER_CAP_COUNT                     4
+#endif
+
+// Limits with 2.5V VDD
+// TODO: Will these change significantly with temperature?
+#if SUPER_CAP_COUNT == 4
+#define SUPER_CAP_FULL_LIMIT              2400
+#define SOLAR_PANEL_GOOD_LIMIT            2000
 #define SUPER_CAP_LOW_LIMIT               1000
-#define SUPER_CAP_FULL_LIMIT              2200
-#define SOLAR_PANEL_MAX_LIMIT             2500
+#elif SUPER_CAP_COUNT == 2
+#define SUPER_CAP_FULL_LIMIT              1300
+#define SOLAR_PANEL_GOOD_LIMIT            1000
+#define SUPER_CAP_LOW_LIMIT                900
+#else
+#error "Specified SUPER_CAP_COUNT not supported"
+#endif
 
 static uint8_t ADC_CHANNELS[] = {
   ADC_CHANNEL_0,
@@ -62,7 +75,7 @@ static uint8_t ADC_CHANNELS[] = {
 typedef enum power_flags_t {
   POWER_FLAG_SUPERCAP_LOW   = 0x01,
   POWER_FLAG_SUPERCAP_FULL  = 0x02,
-  POWER_FLAG_SOLAR_MAX      = 0x04
+  POWER_FLAG_SOLAR_GOOD     = 0x04
 } power_flags_t;
 
 #define ADC_PINS                 (BIT0 | BIT1 | BIT2 | BIT3)
@@ -118,7 +131,7 @@ int main(void)
   while(1) {
     uint32_t adcdata[sizeof(ADC_CHANNELS)] = {0};
     uint16_t temp = 0;
-    uint8_t sleep_min = 60;
+    uint8_t sleep_min;
 
     // Initialise power state
     power_state = 0;
@@ -138,17 +151,14 @@ int main(void)
     get_adc(adcdata, 2, 4);
 
     // Check for power states
-    // FIXME: bad limits at least with 2.5V VDD, ignoring for now
-    if (0){
     if (adcdata[3] < SUPER_CAP_LOW_LIMIT) {
       power_state |= POWER_FLAG_SUPERCAP_LOW;
     }
     if (adcdata[3] > SUPER_CAP_FULL_LIMIT) {
       power_state |= POWER_FLAG_SUPERCAP_FULL;
     }
-    if (adcdata[2] > SOLAR_PANEL_MAX_LIMIT) {
-      power_state |= POWER_FLAG_SOLAR_MAX;
-    }
+    if (adcdata[2] > SOLAR_PANEL_GOOD_LIMIT) {
+      power_state |= POWER_FLAG_SOLAR_GOOD;
     }
 
     // If supercap voltage too low, skip moisture measurement and radio usage
@@ -215,12 +225,15 @@ int main(void)
       }
     }
     #else
-    if (power_state & (POWER_FLAG_SUPERCAP_FULL | POWER_FLAG_SUPERCAP_FULL)) {
+    if ((power_state & POWER_FLAG_SUPERCAP_FULL) &&
+        (power_state & POWER_FLAG_SOLAR_GOOD)) {
       // If full power, sleep only 10 minutes
       sleep_min = 10;
     } else if (power_state & POWER_FLAG_SUPERCAP_LOW) {
       // Low on power, sleep 2 hours
       sleep_min = 120;
+    } else {
+      sleep_min = 60;
     }
     timer_sleep_min(sleep_min, LPM4_bits);
     #endif

@@ -51,6 +51,7 @@
 #endif
 
 // Limits with 2.5V VDD
+// FIXME: tmp275 needs at least 2.7V VDD
 // TODO: Will these change significantly with temperature?
 #if SUPER_CAP_COUNT == 4
 #define SUPER_CAP_FULL_LIMIT              2400
@@ -136,16 +137,13 @@ int main(void)
     // Initialise power state
     power_state = 0;
 
-    #if RB_USE_I2C
-    tmp275_start_oneshot();
-    timer_sleep_ms(220, LPM4_bits);
-    temp = i2c_read();
-    // TMP275 will shutdown after one shot conversion
-    #endif
-
     // Initialise analog pins
     P2SEL |= ADC_PINS;
     P2DIR &= ~ADC_PINS;
+
+    // Busy loop a bit to give the system time to stabilise
+    // TODO: No idea if this is needed at all.
+    busysleep_ms(1);
 
     // Read solar harvester state
     get_adc(adcdata, 2, 4);
@@ -161,8 +159,14 @@ int main(void)
       power_state |= POWER_FLAG_SOLAR_GOOD;
     }
 
-    // If supercap voltage too low, skip moisture measurement and radio usage
+    // If supercap voltage too low, skip measurements and radio usage
     if ((power_state & POWER_FLAG_SUPERCAP_LOW) == 0) {
+
+      #if RB_USE_I2C
+      // Initialise temperature measurement.
+      // Must wait typically 220ms (max 300ms) before reading.
+      tmp275_start_oneshot();
+      #endif
 
       // Configure GD2 (P1.1)
       PMAPPWD = 0x02D52;              // Get write-access to port mapping regs
@@ -185,14 +189,21 @@ int main(void)
       // Enable TEMP_ADJ_VCC
       P1OUT |= BIT4;
 
-      // Wait for the moisture sensor to stabilize
-      busysleep_ms(250);
+      // Wait for the moisture sensor to stabilize and and give time for the
+      // tmp275 measurement.
+      // TODO: IIRC using a timer broke something, hence the busy looping.
+      busysleep_ms(300);
 
       // Read soil moisture and reference
       get_adc(adcdata, 0, 1);
 
       // Disable TEMP_ADJ_VCC
       P1OUT &= ~BIT4;
+
+      #if RB_USE_I2C
+      temp = i2c_read();
+      // TMP275 will shutdown after one shot conversion
+      #endif
 
       // gdo2 output configuration, 0x29 == RF_RDY
       WriteSingleReg(IOCFG2, 0x29);
@@ -227,10 +238,10 @@ int main(void)
     #else
     if ((power_state & POWER_FLAG_SUPERCAP_FULL) &&
         (power_state & POWER_FLAG_SOLAR_GOOD)) {
-      // If full power, sleep only 10 minutes
+      // If full power and the Sun is shining, sleep less
       sleep_min = 10;
     } else if (power_state & POWER_FLAG_SUPERCAP_LOW) {
-      // Low on power, sleep 2 hours
+      // Low on power, sleeping longer
       sleep_min = 120;
     } else {
       sleep_min = 60;
